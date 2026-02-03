@@ -6,7 +6,6 @@ Hands-free, speech-enabled flashcard app for finance interview prep. Study while
 
 ## Available Decks
 
-- **CLO Interview Prep** - 49 cards covering CLO structure, tranches, coverage tests, and key metrics
 - **LBO Modeling** - Leveraged buyout fundamentals, deal structure, and returns analysis
 - **DCF Valuation** - Discounted cash flow analysis, WACC, and terminal value
 - **M&A Interview Prep** - Deal types, accretion/dilution, synergies, and process
