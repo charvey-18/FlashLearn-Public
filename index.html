@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FlashLearn</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0f172a; }
+  </style>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-type="module">
+const { useState, useEffect, useRef } = React;
+
+// ============================================================
+// DECK DATA
+// ============================================================
+
+const DECKS = [
+  {
+    id: 'clo',
+    name: 'CLO Interview Prep',
+    icon: '\u{1F4CA}',
+    description: 'Collateralized Loan Obligations: structure, tranches, coverage tests, and key metrics',
+    cards: [
+      { category: "CLO Fundamentals", front: "What is a CLO?", back: "A Collateralized Loan Obligation is a securitization vehicle that pools leveraged loans, typically 150 to 300 loans, and issues tranched securities backed by those loans. It allows investors to access corporate loan exposure at various risk and return profiles.", source: "S&P Global" },
+      { category: "CLO Fundamentals", front: "What is the typical size of a CLO?", back: "A typical US CLO ranges from 400 to 600 million dollars. European CLOs are typically 300 to 500 million euros. Some larger managers issue CLOs exceeding 1 billion dollars.", source: "LCD PitchBook" },
+      { category: "CLO Fundamentals", front: "Who are the key parties in a CLO?", back: "There are five key parties. The CLO Manager selects and manages loans. The Trustee holds assets and calculates payments. The Arranger structures and distributes the deal. Rating Agencies assign ratings. And Investors purchase the tranches.", source: "LSTA" },
+      { category: "CLO Fundamentals", front: "What types of assets are in a CLO portfolio?", back: "Primarily senior secured first lien leveraged loans, making up over 90 percent of the portfolio. May also include second lien loans at 5 to 10 percent, high yield bonds in a limited bucket, and middle market loans.", source: "Moody's" },
+      { category: "CLO Fundamentals", front: "What is a leveraged loan?", back: "A loan to companies with significant debt or below investment grade ratings. Typical characteristics include a spread of SOFR plus 300 to 500 basis points, senior secured with first lien on assets, floating rate, and debt to EBITDA of 4 to 6 times or higher.", source: "Federal Reserve" },
+      { category: "Tranche Structure", front: "Describe the typical CLO capital structure.", back: "From top to bottom. Triple A at 60 to 65 percent with the lowest spread. Double A at 8 to 12 percent. Single A at 6 to 8 percent. Triple B at 4 to 6 percent. Double B at 3 to 5 percent. And Equity at 8 to 12 percent which takes first losses but receives excess spread.", source: "S&P Global" },
+      { category: "Tranche Structure", front: "What is subordination?", back: "Subordination is the percentage of capital structure junior to a tranche that absorbs losses first. If Triple A has 35 percent subordination, the portfolio must lose more than 35 percent before Triple A takes any loss. This is key to achieving high ratings.", source: "Moody's" },
+      { category: "Tranche Structure", front: "What are typical CLO tranche spreads?", back: "Triple A is SOFR plus 130 to 160 basis points. Double A is plus 180 to 220. Single A is plus 230 to 280. Triple B is plus 350 to 450. Double B is plus 600 to 750. Equity targets 12 to 18 percent IRR.", source: "LCD" },
+      { category: "Tranche Structure", front: "What is the equity tranche?", back: "The first loss position receiving residual cash flows after debt tranches. Returns come from excess spread between loans and debt costs, trading gains, and principal appreciation. Target returns are 12 to 18 percent IRR.", source: "Creditflux" },
+      { category: "Coverage Tests", front: "What is the Overcollateralization Test?", back: "The OC test measures if portfolio par value covers debt. The formula is Collateral Par minus Defaults, divided by Tranche Par Outstanding. Each tranche has a trigger, for example Triple A might have 128 percent. Failing diverts cash to deleverage.", source: "Moody's" },
+      { category: "Coverage Tests", front: "What is the Interest Coverage Test?", back: "The IC test measures if portfolio interest income covers debt interest. The formula is Interest Proceeds divided by Interest Due. Triggers are typically 120 percent for senior tranches. Failure diverts cash to pay down senior notes.", source: "S&P" },
+      { category: "Coverage Tests", front: "What happens when OC tests fail?", back: "The waterfall stops at the failing level. Cash redirects to pay senior notes. Equity receives nothing. This continues until the test passes. Debt par decreases, improving the OC ratio. Once cured, normal waterfall resumes.", source: "LSTA" },
+      { category: "Coverage Tests", front: "What is the CCC haircut?", back: "When Triple C assets exceed a threshold, typically 7.5 percent, the excess is carried at market value instead of par in OC calculations. This prevents reaching for yield with weak credits and can significantly impact OC cushion.", source: "S&P" },
+      { category: "Coverage Tests", front: "What is OC cushion?", back: "OC cushion equals actual OC ratio minus the trigger. If actual is 132 percent and trigger is 128 percent, cushion is 4 percent. It indicates proximity to cash diversion, affects distributions, and guides trading decisions. Healthy cushion is 2 to 8 percent.", source: "Intex" },
+      { category: "Key Metrics", front: "What is WARF?", back: "Weighted Average Rating Factor measures portfolio credit quality. Each rating has a factor. B equals 2720. Triple C equals 6500. WARF is calculated as the sum of Rating Factor times Par Weight. Lower is better. Maximum test is typically 2800 to 2900.", source: "Moody's" },
+      { category: "Key Metrics", front: "What is Weighted Average Spread?", back: "WAS is the par weighted average spread over SOFR. Typical range is 350 to 400 basis points. It drives equity returns and must exceed CLO debt costs for positive arbitrage.", source: "LCD" },
+      { category: "Key Metrics", front: "What is Diversity Score?", back: "Moody's metric converting the portfolio to equivalent uncorrelated assets. Higher means more diversified. Minimum test is typically 60 to 80. Critical for rating agency models.", source: "Moody's" },
+      { category: "Key Metrics", front: "What is MVOC versus OC?", back: "MVOC uses market prices. Market Value divided by Tranche Par. Regular OC uses par values. MVOC shows real time protection when loans trade below par. Both are monitored closely.", source: "Bank of America" },
+      { category: "Cash Flow", front: "What is the CLO payment waterfall?", back: "Priority of payments. First, trustee and admin fees. Second, senior management fee. Third, interest to Triple A, Double A, Single A. Fourth, coverage test cures. Fifth, interest to Triple B and Double B. Sixth, subordinated management fee. Finally, equity distributions.", source: "LSTA" },
+      { category: "Cash Flow", front: "What is the reinvestment period?", back: "Typically 4 to 5 years where principal proceeds are reinvested in new loans. It maintains portfolio size, allows active risk management, and enables trading. After it ends, the CLO amortizes.", source: "S&P" },
+      { category: "Cash Flow", front: "What happens after reinvestment ends?", back: "Amortization phase begins. Principal pays down debt sequentially starting with Triple A. Trading becomes limited. Portfolio shrinks. Equity depends on remaining spread. Structure winds down to maturity or call.", source: "Fitch" },
+      { category: "Manager Role", front: "What are CLO manager responsibilities?", back: "Initial portfolio construction. Ongoing credit monitoring. Trading to optimize portfolio. Maintaining test compliance. Cash flow management. Investor communication. Workout management. And balancing equity returns with debt protection.", source: "LSTA" },
+      { category: "Manager Role", front: "How is a CLO manager compensated?", back: "Senior fee is 15 to 20 basis points annually paid senior in waterfall. Subordinated fee is 25 to 35 basis points paid after tests. Some earn incentive fees on equity returns above a hurdle. This aligns manager with equity.", source: "LSTA" },
+      { category: "Manager Role", front: "What is risk retention?", back: "Regulation requiring managers to retain 5 percent economic interest. Can be horizontal, holding 5 percent of equity, or vertical, holding 5 percent of each tranche. Aligns interests and prevents originate to distribute issues.", source: "SEC" },
+      { category: "Manager Role", front: "What is par building versus risk management?", back: "Par building means buying discounted loans that may pull to par, increasing OC. Risk is buying troubled credits. Risk management means selling deteriorating credits early. Risk is crystallizing losses. Good managers balance both.", source: "Creditflux" },
+      { category: "Constraints", front: "What are CLO concentration limits?", back: "Single obligor is 2 to 2.5 percent max. Single industry is 10 to 12 percent max. Second lien is 5 to 10 percent max. Triple C is 7.5 percent before haircuts. Violations may block purchases.", source: "LSTA" },
+      { category: "Constraints", front: "What is a covenant lite loan?", back: "Loans without maintenance covenants like quarterly leverage tests. Only incurrence based covenants. About 90 percent of new loans are covenant lite. Borrowers can deteriorate longer before default. Managers must monitor more closely.", source: "LSTA" },
+      { category: "Documentation", front: "What is the CLO indenture?", back: "Primary legal document governing the CLO. Contains the waterfall, coverage tests, eligibility criteria, trading restrictions, event of default provisions, and redemption rights. Typically 200 to 400 pages. Managers must know it well.", source: "LSTA" },
+      { category: "Documentation", front: "What is the non-call period?", back: "Typically 1 to 2 years where equity cannot redeem the CLO. Protects debt investors from early prepayment. After expiry, equity can refinance or exit. Important optionality for equity holders.", source: "LSTA" },
+      { category: "Risk Factors", front: "What are primary CLO risks?", back: "Credit risk from defaults. Basis risk from index mismatches. Reinvestment risk if loans cannot be found. Liquidity risk from infrequent trading. Manager risk from poor selection. Prepayment risk when loans refinance. And structural risk from documentation complexity.", source: "SEC" },
+      { category: "Risk Factors", front: "How did CLOs perform in 2008?", back: "Remarkably well. No Triple A tranches defaulted. Very few investment grade tranches defaulted. Loan recoveries were around 70 percent. Active management helped. Senior secured collateral and diversification were key factors.", source: "S&P" },
+      { category: "Risk Factors", front: "How did CLOs perform during COVID?", back: "Severe but brief stress. Triple A spreads widened to 175 basis points. Loan prices dropped to 75 to 80 cents then recovered. Downgrades spiked initially. No CLO debt defaults. Strong recovery by year end.", source: "Moody's" },
+      { category: "Market", front: "What is the US CLO market size?", back: "Approximately 1 trillion dollars outstanding. Annual issuance is 100 to 140 billion. Largest buyers are banks for Triple A, insurance for mezzanine, and hedge funds for Double B and equity.", source: "SIFMA" },
+      { category: "Market", front: "What drives CLO issuance?", back: "Arbitrage economics between loan yields and debt costs. Equity investor demand. Loan supply and spreads. Credit and default outlook. Risk retention capital. And warehouse availability. Issuance slows when arbitrage tightens.", source: "LCD" },
+      { category: "Market", front: "What is a CLO warehouse?", back: "Financing facility to accumulate loans before closing. Bank provides 4 to 5 times leverage secured by loans. Manager builds portfolio over 3 to 6 months. Benefits include locking in prices. Risk includes market moves.", source: "LSTA" },
+      { category: "Interview", front: "Walk through the CLO lifecycle.", back: "Warehouse phase to accumulate loans over 3 to 6 months. Pricing and closing to finalize structure. Ramp up to complete investment. Reinvestment period for active management over 4 to 5 years. Amortization to pay down debt. Then maturity or call.", source: "S&P" },
+      { category: "Interview", front: "A loan is downgraded to CCC. What do you do?", back: "Analyze why it was downgraded. Check Triple C bucket utilization. Assess OC impact with haircut. Determine if company is fixable. Check price and liquidity. Hold if fixable and bucket has room. Sell if impaired or bucket is full.", source: "Creditflux" },
+      { category: "Interview", front: "Loan prices drop 10 percent market wide. What happens?", back: "OC tests use par so no immediate impact. MVOC drops significantly. May trigger downgrades. Equity NAV declines. Reinvestment opportunities improve. No margin calls. Assess if decline is fundamental or technical. Could be a par building opportunity.", source: "JP Morgan" },
+      { category: "Interview", front: "Pitch a leveraged loan for a CLO.", back: "Cover company overview including business and sponsor. Investment thesis on why it's a good credit. Key financials like leverage and EBITDA. Industry position and trends. Documentation highlights. Spread and relative value. Key risks and mitigants.", source: "Wall Street Prep" },
+      { category: "Advanced", front: "What is CLO equity NAV?", back: "Net Asset Value equals Market Value of Loans minus Par Value of Debt plus Accrued Interest. Represents liquidation value. Equity trades at 80 to 105 percent of NAV depending on manager quality and portfolio health.", source: "Intex" },
+      { category: "Advanced", front: "Static versus Managed CLO?", back: "Managed CLOs have active management, trading, reinvestment, and fees. Over 95 percent of market. Static CLOs have no management after close, fixed portfolio, lower fees. Managed outperformed in 2008 due to trading flexibility.", source: "S&P" },
+      { category: "Advanced", front: "What is a middle market CLO?", back: "Backed by loans to smaller companies with 10 to 75 million EBITDA. Higher spreads at SOFR plus 500 to 600. Less liquid. Relationship driven. Often directly originated. Higher risk and return. Growing segment.", source: "LCD" },
+      { category: "Current", front: "What are liability management exercises?", back: "Restructuring tactics transferring value between creditors. Drop downs move assets to unrestricted subsidiaries. Uptier exchanges create senior debt above existing. Can impair CLO loan values. Called creditor on creditor violence.", source: "Creditflux" },
+      { category: "Current", front: "How does CLO manager tiering work?", back: "Tier 1 is largest managers with longest track records and tightest pricing like Blackstone and Carlyle. Tier 2 is established with good records. Tier 3 is newer or smaller with wider spreads. Performance increasingly determines tier.", source: "Creditflux" },
+    ]
+  },
+  {
+    id: 'lbo',
+    name: 'LBO Modeling',
+    icon: '\u{1F3E6}',
+    description: 'Leveraged Buyout fundamentals: deal structure, returns analysis, and modeling mechanics',
+    cards: [
+      { category: "LBO Basics", front: "What is a leveraged buyout?", back: "An acquisition of a company using a significant amount of borrowed money, typically 60 to 70 percent debt, to meet the cost of acquisition. The assets of the acquired company often serve as collateral. The goal is to generate returns through debt paydown, EBITDA growth, and multiple expansion.", source: "Wall Street Prep" },
+      { category: "LBO Basics", front: "What are the key characteristics of a good LBO candidate?", back: "Strong and predictable cash flows. Leading market position with defensible business. Low capex requirements relative to cash flow. Opportunities for operational improvement. Strong management team. Clear exit opportunities. Limited cyclicality. Asset base that can support debt.", source: "Macabacus" },
+      { category: "LBO Basics", front: "What are the primary sources of returns in an LBO?", back: "Three main drivers. First, debt paydown using free cash flow reduces net debt over the hold period. Second, EBITDA growth through revenue increases and margin expansion. Third, multiple expansion if exit multiple exceeds entry multiple. Debt paydown is the most reliable source.", source: "Wall Street Oasis" },
+      { category: "Deal Structure", front: "What is a typical LBO capital structure?", back: "Senior secured debt at 3 to 4 times EBITDA, often a Term Loan B. Subordinated or mezzanine debt at 1 to 2 times. Equity contribution of 30 to 40 percent of total enterprise value. Total leverage of 5 to 6 times EBITDA is common. Senior debt is cheapest but most restrictive.", source: "Leveraged Commentary & Data" },
+      { category: "Deal Structure", front: "What is the difference between a Term Loan A and Term Loan B?", back: "Term Loan A amortizes over the life of the loan, typically 5 to 7 years, with mandatory quarterly payments. Term Loan B has minimal amortization of 1 percent per year with a bullet payment at maturity, typically 7 years. TLB is more common in LBOs because it preserves cash flow.", source: "LSTA" },
+      { category: "Deal Structure", front: "What is mezzanine debt?", back: "Subordinated debt sitting between senior debt and equity in the capital structure. Typically unsecured. Higher interest rate of 12 to 20 percent, often with PIK interest component. May include equity warrants. Used to bridge the gap between senior debt capacity and equity contribution.", source: "Investopedia" },
+      { category: "Returns", front: "How do you calculate IRR in an LBO?", back: "IRR is the discount rate that makes the net present value of all cash flows equal to zero. In an LBO context, the initial equity investment is the outflow, and the exit equity value plus any dividends received are the inflows. A typical PE fund targets a 20 to 25 percent gross IRR over a 3 to 5 year hold.", source: "Wall Street Prep" },
+      { category: "Returns", front: "What is MOIC and how does it relate to IRR?", back: "Multiple of Invested Capital equals total value received divided by total equity invested. A 2.0x MOIC means doubling your money. MOIC does not account for timing, while IRR does. A 2.5x MOIC over 3 years is roughly a 36 percent IRR, but over 5 years is roughly 20 percent IRR. Both metrics are used together.", source: "Bain & Company" },
+      { category: "Returns", front: "What is a dividend recapitalization?", back: "A transaction where a PE-owned company raises additional debt to pay a special dividend to its equity holders. It allows sponsors to realize partial returns without selling the company. Reduces equity at risk but increases leverage. Can be controversial if it weakens the company financially.", source: "Pitchbook" },
+      { category: "Modeling", front: "Walk through the key steps of building an LBO model.", back: "Step 1, build operating model with revenue and EBITDA projections. Step 2, determine purchase price and sources and uses. Step 3, build the debt schedule with mandatory and optional repayments. Step 4, project free cash flow and debt paydown. Step 5, calculate exit value using an exit multiple. Step 6, compute equity returns including IRR and MOIC.", source: "Wall Street Prep" },
+      { category: "Modeling", front: "What are sources and uses in an LBO?", back: "Sources are where the money comes from: senior debt, subordinated debt, equity contribution, and rollover equity. Uses are where the money goes: purchase equity value, repay existing debt, transaction fees, and financing fees. Sources must equal uses. This table determines the equity check.", source: "Macabacus" },
+      { category: "Modeling", front: "How do you determine the maximum leverage in an LBO?", back: "Consider the company's ability to service debt through cash flow coverage ratios. Minimum interest coverage of 2.0x. Minimum fixed charge coverage of 1.2x. Maximum total leverage based on industry norms. Lender appetite and credit market conditions. Covenant headroom requirements.", source: "S&P Global" },
+      { category: "Exit", front: "What are common LBO exit strategies?", back: "Strategic sale to a corporate buyer, often achieving the highest multiple. Secondary buyout or sale to another PE firm. Initial public offering for large, well-performing companies. Dividend recapitalization for partial liquidity. Management buyout in select situations. Average hold period is 4 to 6 years.", source: "Bain & Company" },
+      { category: "Exit", front: "What is a secondary buyout?", back: "When one private equity firm sells a portfolio company to another private equity firm. Now represents over 50 percent of PE exits. Can be controversial as critics question value creation. Works when the new sponsor has a different operational playbook or growth thesis.", source: "Pitchbook" },
+    ]
+  },
+  {
+    id: 'dcf',
+    name: 'DCF Valuation',
+    icon: '\u{1F4B0}',
+    description: 'Discounted Cash Flow analysis: WACC, terminal value, and valuation mechanics',
+    cards: [
+      { category: "DCF Basics", front: "What is a DCF and when would you use it?", back: "A Discounted Cash Flow analysis values a company by projecting its future free cash flows and discounting them back to present value using an appropriate discount rate. Best used for companies with predictable cash flows. Less appropriate for early-stage companies, banks, or highly cyclical businesses.", source: "Damodaran" },
+      { category: "DCF Basics", front: "Walk through the steps of a DCF.", back: "Step 1, project unlevered free cash flows for 5 to 10 years. Step 2, calculate the terminal value. Step 3, discount all cash flows to present value using WACC. Step 4, sum the present values to get enterprise value. Step 5, subtract net debt and add cash to get equity value. Step 6, divide by shares outstanding for per-share value.", source: "Wall Street Prep" },
+      { category: "Free Cash Flow", front: "How do you calculate unlevered free cash flow?", back: "Start with EBIT. Subtract taxes at the marginal rate to get NOPAT. Add back depreciation and amortization. Subtract capital expenditures. Subtract increases in net working capital. The result is cash flow available to all capital providers, both debt and equity holders.", source: "Damodaran" },
+      { category: "Free Cash Flow", front: "Why do we use unlevered free cash flow in a DCF?", back: "Unlevered free cash flow represents cash available to all investors, both debt and equity. This allows us to value the entire enterprise independent of capital structure. We then discount at WACC, which reflects returns required by all capital providers. This separates operating performance from financing decisions.", source: "McKinsey Valuation" },
+      { category: "WACC", front: "How do you calculate WACC?", back: "WACC equals the weight of equity times cost of equity, plus the weight of debt times cost of debt times one minus the tax rate. Use market values for weights, not book values. Cost of equity is calculated using CAPM. Cost of debt is the yield on the company's existing debt or comparable debt.", source: "Brealey Myers" },
+      { category: "WACC", front: "How do you calculate cost of equity using CAPM?", back: "Cost of equity equals the risk-free rate plus beta times the equity risk premium. Risk-free rate is the 10-year Treasury yield. Beta measures systematic risk relative to the market. Equity risk premium is the expected market return minus the risk-free rate, typically 5 to 7 percent. Can add a size premium for small companies.", source: "Damodaran" },
+      { category: "WACC", front: "What is beta and how do you estimate it?", back: "Beta measures a stock's sensitivity to market movements. A beta of 1.0 means it moves with the market. Higher beta means more volatile. Estimated by regressing stock returns against market returns over 2 to 5 years. For private companies, use comparable company betas, unlevered and re-levered for the target capital structure.", source: "Brealey Myers" },
+      { category: "Terminal Value", front: "What are the two methods for calculating terminal value?", back: "The Gordon Growth Model applies a perpetuity growth rate to the final year cash flow. Formula is final year FCF times one plus growth rate, divided by WACC minus growth rate. The Exit Multiple Method applies an EV to EBITDA multiple to terminal year EBITDA. Both should yield similar results if assumptions are consistent.", source: "McKinsey Valuation" },
+      { category: "Terminal Value", front: "What is a reasonable perpetuity growth rate?", back: "Typically 2 to 3 percent, in line with long-term GDP growth and inflation. Should not exceed long-term economic growth as no company grows faster than the economy forever. Higher rates dramatically increase terminal value and can distort the DCF. The terminal value often represents 60 to 80 percent of total enterprise value.", source: "Damodaran" },
+      { category: "Sensitivity", front: "What are the key sensitivities in a DCF?", back: "The most impactful assumptions are the discount rate or WACC, the terminal growth rate, revenue growth rates, operating margins, and capital expenditure assumptions. Small changes in WACC or terminal growth can significantly shift the valuation. Always present results as a range using sensitivity tables.", source: "Wall Street Prep" },
+      { category: "Practical", front: "What are the main limitations of a DCF?", back: "Highly sensitive to assumptions, especially terminal value. Garbage in, garbage out. Difficult for companies without predictable cash flows. Does not reflect market sentiment or relative valuation. Requires accurate cost of capital estimation. Terminal value often dominates, making near-term projections less impactful.", source: "Damodaran" },
+      { category: "Practical", front: "How does a DCF differ from comparable company analysis?", back: "DCF is an intrinsic valuation based on a company's own fundamentals. Comps is a relative valuation based on how similar companies are priced. DCF captures company-specific growth and risk. Comps reflect current market conditions. Both approaches should be used together to triangulate value.", source: "McKinsey Valuation" },
+    ]
+  },
+  {
+    id: 'mna',
+    name: 'M&A Interview Prep',
+    icon: '\u{1F91D}',
+    description: 'Mergers & Acquisitions: deal types, accretion/dilution, synergies, and process',
+    cards: [
+      { category: "M&A Basics", front: "What are the main types of M&A transactions?", back: "Mergers combine two companies into one. Acquisitions involve one company purchasing another. Asset purchases buy specific assets rather than the entire entity. Stock purchases buy ownership shares. Joint ventures create a new entity owned by both parties. Each has different tax, legal, and accounting implications.", source: "DePamphilis M&A" },
+      { category: "M&A Basics", front: "Why do companies pursue acquisitions?", back: "Revenue synergies from cross-selling or new markets. Cost synergies from eliminating redundancies. Acquiring technology or intellectual property. Gaining market share or eliminating competition. Achieving economies of scale. Tax benefits. Diversification. Access to new geographies or distribution channels.", source: "McKinsey" },
+      { category: "M&A Basics", front: "What is the difference between a stock deal and an asset deal?", back: "In a stock deal, the buyer acquires all shares and inherits all assets and liabilities. The seller pays capital gains tax. In an asset deal, the buyer selects specific assets and liabilities. The buyer gets a tax step-up on assets. The seller may face double taxation for C-corps. Asset deals are cleaner but more complex.", source: "Wall Street Prep" },
+      { category: "Accretion/Dilution", front: "What is accretion dilution analysis?", back: "It measures whether an acquisition increases or decreases the acquirer's earnings per share. If pro forma EPS is higher than standalone EPS, the deal is accretive. If lower, it is dilutive. Key inputs are purchase price, financing mix, target earnings, synergies, and new share issuance.", source: "Rosenbaum & Pearl" },
+      { category: "Accretion/Dilution", front: "When is a deal typically accretive?", back: "When the target's P/E ratio is lower than the acquirer's, in an all-stock deal. When cost synergies are significant. When the deal is financed with low-cost debt rather than equity. When the target has strong earnings relative to the premium paid. Accretion alone does not mean value creation.", source: "Wall Street Prep" },
+      { category: "Synergies", front: "What are the different types of synergies?", back: "Cost synergies include headcount reduction, facility consolidation, procurement savings, and technology rationalization. Revenue synergies include cross-selling, geographic expansion, and pricing power. Financial synergies include lower cost of capital and tax benefits. Cost synergies are more reliable and typically realized within 1 to 3 years.", source: "McKinsey" },
+      { category: "Synergies", front: "How do you value synergies?", back: "Estimate the annual run-rate synergy amount. Determine the timeline to achieve full synergies, typically 2 to 3 years. Subtract one-time costs to achieve them such as severance or integration costs. Discount or capitalize the net synergies. Buyers typically pay 25 to 50 percent of synergy value to the seller as part of the premium.", source: "Deloitte" },
+      { category: "Valuation", front: "How do you value a target in M&A?", back: "Use multiple methodologies. Comparable company analysis using trading multiples. Precedent transaction analysis using deal multiples. DCF analysis for intrinsic value. LBO analysis to determine PE bid price. Sum of the parts for diversified companies. The range from all methods informs the offer price.", source: "Rosenbaum & Pearl" },
+      { category: "Valuation", front: "What is a control premium?", back: "The amount paid above the current trading price to acquire a controlling interest. Typically 20 to 40 percent above the unaffected share price. Reflects the value of control, synergies, and strategic benefits. Higher premiums for contested deals, strategic assets, or significant synergy potential.", source: "FactSet MergerMetrics" },
+      { category: "Process", front: "Walk through the sell-side M&A process.", back: "Phase 1, preparation: engage advisors, prepare CIM and financial model. Phase 2, marketing: contact potential buyers, sign NDAs, distribute materials. Phase 3, first round: receive preliminary indications of interest. Phase 4, due diligence: grant data room access to shortlisted buyers. Phase 5, final bids: receive definitive offers. Phase 6, negotiation and signing. Phase 7, closing after regulatory approval.", source: "Rosenbaum & Pearl" },
+      { category: "Process", front: "What is a fairness opinion?", back: "A letter from an investment bank stating that a proposed transaction price is fair from a financial point of view to the shareholders. Required by the board's fiduciary duty. Based on DCF, comps, precedent transactions, and premiums analysis. Protects directors from shareholder lawsuits challenging the deal price.", source: "Rosenbaum & Pearl" },
+      { category: "Defense", front: "What are common M&A defense mechanisms?", back: "Poison pill or shareholder rights plan dilutes hostile bidder. Staggered board prevents full board replacement in one election. White knight finds a friendlier buyer. Crown jewel defense sells key assets. Pac-Man defense makes counter-bid for the acquirer. Golden parachutes increase acquisition cost.", source: "DePamphilis M&A" },
+    ]
+  },
+  {
+    id: 'accounting',
+    name: 'Accounting Fundamentals',
+    icon: '\u{1F4D2}',
+    description: 'Financial statements, key ratios, and accounting principles for interviews',
+    cards: [
+      { category: "Financial Statements", front: "What are the three main financial statements and how are they linked?", back: "Income statement shows profitability over a period. Balance sheet shows assets, liabilities, and equity at a point in time. Cash flow statement shows cash movements. Net income from the income statement flows to retained earnings on the balance sheet and is the starting point for cash flow from operations.", source: "Accounting Standards Codification" },
+      { category: "Financial Statements", front: "Walk through the income statement.", back: "Revenue minus cost of goods sold equals gross profit. Minus operating expenses like SGA and R&D equals operating income or EBIT. Minus interest expense plus interest income equals pre-tax income. Minus taxes equals net income. Key margins are gross margin, operating margin, and net margin.", source: "Wall Street Prep" },
+      { category: "Financial Statements", front: "Walk through the balance sheet.", back: "Assets equal liabilities plus shareholders equity. Current assets include cash, receivables, and inventory. Long-term assets include PP&E, goodwill, and intangibles. Current liabilities include payables and short-term debt. Long-term liabilities include long-term debt. Equity includes common stock, APIC, and retained earnings.", source: "Accounting Standards Codification" },
+      { category: "Financial Statements", front: "Walk through the cash flow statement.", back: "Three sections. Operating starts with net income, adds back non-cash charges like D&A, adjusts for working capital changes. Investing includes capital expenditures, acquisitions, and asset sales. Financing includes debt issuance and repayment, equity issuance and buybacks, and dividends. The sum equals the change in cash.", source: "Wall Street Prep" },
+      { category: "Key Concepts", front: "What is the difference between cash and accrual accounting?", back: "Cash accounting recognizes revenue when cash is received and expenses when cash is paid. Accrual accounting recognizes revenue when earned and expenses when incurred, regardless of cash timing. GAAP requires accrual accounting. The difference between them is captured in working capital changes on the cash flow statement.", source: "FASB" },
+      { category: "Key Concepts", front: "What is working capital and why does it matter?", back: "Working capital equals current assets minus current liabilities. Operating working capital excludes cash and debt. Increases in working capital use cash. Decreases in working capital generate cash. Companies with negative working capital cycles like Amazon generate cash as they grow. It is a key driver of free cash flow.", source: "McKinsey Valuation" },
+      { category: "Key Concepts", front: "What is depreciation and how does it affect the statements?", back: "Depreciation allocates the cost of a tangible asset over its useful life. On the income statement, it reduces operating income and net income. On the balance sheet, accumulated depreciation reduces net PP&E. On the cash flow statement, it is added back as a non-cash charge. It creates a tax shield equal to depreciation times the tax rate.", source: "Accounting Standards Codification" },
+      { category: "Key Concepts", front: "What is goodwill?", back: "Goodwill equals the purchase price minus the fair market value of net identifiable assets acquired. It arises only from acquisitions, never organically. It is not amortized but is tested annually for impairment. If fair value drops below carrying value, goodwill is written down, creating a non-cash charge on the income statement.", source: "FASB ASC 350" },
+      { category: "Key Concepts", front: "What is deferred revenue?", back: "Cash received for goods or services not yet delivered. It is a liability on the balance sheet because the company owes future performance. When the service is delivered, deferred revenue decreases and revenue is recognized on the income statement. Common in SaaS, subscriptions, and prepaid contracts.", source: "FASB ASC 606" },
+      { category: "Ratios", front: "What are the key profitability ratios?", back: "Gross margin equals gross profit divided by revenue. Operating margin equals EBIT divided by revenue. Net margin equals net income divided by revenue. ROE equals net income divided by shareholders equity. ROA equals net income divided by total assets. ROIC equals NOPAT divided by invested capital.", source: "CFA Institute" },
+      { category: "Ratios", front: "What are the key leverage ratios?", back: "Debt to equity equals total debt divided by equity. Debt to EBITDA equals total debt divided by EBITDA. Interest coverage equals EBIT divided by interest expense. Net debt equals total debt minus cash. Fixed charge coverage equals EBIT plus fixed charges divided by fixed charges plus interest.", source: "S&P Global" },
+      { category: "Ratios", front: "What are the key liquidity ratios?", back: "Current ratio equals current assets divided by current liabilities. Target is above 1.5. Quick ratio excludes inventory from current assets. Target is above 1.0. Cash ratio equals cash divided by current liabilities. Most conservative. Days sales outstanding, days inventory outstanding, and days payable outstanding measure the cash conversion cycle.", source: "CFA Institute" },
+    ]
+  }
+];
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+const saveData = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} };
+const loadData = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch(e) { return d; } };
+
+const getDeckProgress = (deck) => {
+  const progress = loadData(`progress_${deck.id}`, {});
+  const known = Object.values(progress).filter(v => v === 'known').length;
+  return { known, total: deck.cards.length, percent: deck.cards.length > 0 ? Math.round((known / deck.cards.length) * 100) : 0 };
+};
+
+const TOPIC_REQUEST_URL = "https://github.com/charvey-18/FlashLearn-Public/issues/new?" +
+  "title=" + encodeURIComponent("Topic Request: ") +
+  "&body=" + encodeURIComponent(
+    "## Topic Request\n\n**Topic name:**\n\n\n**Specific areas to cover:**\n\n\n**Any additional context:**\n\n"
+  ) +
+  "&labels=topic-request";
+
+// ============================================================
+// APP
+// ============================================================
+
+function App() {
+  const [view, setView] = useState('home');
+  const [activeDeck, setActiveDeck] = useState(null);
+
+  if (view === 'home') return <Home decks={DECKS} setActiveDeck={setActiveDeck} setView={setView} />;
+  if (view === 'study') return <Study deck={activeDeck} setView={setView} />;
+  return null;
+}
+
+// ============================================================
+// HOME
+// ============================================================
+
+function Home({ decks, setActiveDeck, setView }) {
+  return (
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #0f172a, #1e293b)', padding: '40px 20px', fontFamily: 'system-ui' }}>
+      <div style={{ maxWidth: '500px', margin: '0 auto' }}>
+        <h1 style={{ textAlign: 'center', fontSize: '32px', fontWeight: 700, color: '#60a5fa', marginBottom: '8px' }}>FlashLearn</h1>
+        <p style={{ textAlign: 'center', color: '#94a3b8', marginBottom: '32px' }}>Hands-free flashcard learning</p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {decks.map(deck => {
+            const prog = getDeckProgress(deck);
+            return (
+              <div key={deck.id} onClick={() => { setActiveDeck(deck); setView('study'); }}
+                style={{ background: 'rgba(30,41,59,0.9)', borderRadius: '16px', padding: '20px', cursor: 'pointer', border: '1px solid rgba(100,116,139,0.2)', transition: 'border-color 0.2s' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <span style={{ fontSize: '36px' }}>{deck.icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <h2 style={{ color: '#f1f5f9', fontSize: '18px', margin: 0 }}>{deck.name}</h2>
+                    <p style={{ color: '#64748b', margin: '4px 0 0', fontSize: '13px' }}>{deck.description}</p>
+                  </div>
+                </div>
+                <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ width: `${prog.percent}%`, height: '100%', background: prog.percent === 100 ? '#10b981' : '#3b82f6', borderRadius: '3px', transition: 'width 0.3s' }}></div>
+                  </div>
+                  <span style={{ color: '#64748b', fontSize: '12px', whiteSpace: 'nowrap' }}>{prog.known}/{prog.total} mastered</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Request a Topic */}
+        <a href={TOPIC_REQUEST_URL} target="_blank" rel="noopener noreferrer"
+          style={{
+            display: 'block', textAlign: 'center', marginTop: '24px', padding: '14px 24px',
+            borderRadius: '12px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(30,41,59,0.5)',
+            color: '#94a3b8', fontSize: '14px', textDecoration: 'none', cursor: 'pointer', fontFamily: 'system-ui'
+          }}>
+          {'\u{1F4AC}'} Request a Topic
+        </a>
+
+        {/* Footer tip */}
+        <p style={{ textAlign: 'center', color: '#4b5563', fontSize: '12px', marginTop: '24px' }}>
+          {'\u{1F3A7}'} All decks support headphone controls for hands-free learning
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// STUDY
+// ============================================================
+
+function Study({ deck, setView }) {
+  const [cardIndex, setCardIndex] = useState(0);
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(() => loadData(`progress_${deck.id}`, {}));
+  const [favorites, setFavorites] = useState(() => loadData(`favorites_${deck.id}`, {}));
+  const [shuffled, setShuffled] = useState(false);
+  const [filter, setFilter] = useState('all');
+  const [order, setOrder] = useState(() => deck.cards.map((_, i) => i));
+  const [voice, setVoice] = useState(null);
+  const [voices, setVoices] = useState([]);
+  const [speed, setSpeed] = useState(0.9);
+  const [phase, setPhase] = useState('idle');
+
+  const timerRef = useRef(null);
+  const utteranceRef = useRef(null);
+
+  const card = deck.cards[order[cardIndex]];
+  const knownCount = Object.values(progress).filter(v => v === 'known').length;
+
+  useEffect(() => {
+    const loadVoices = () => {
+      const allVoices = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
+      const premiumOrder = [
+        'Samantha', 'Karen', 'Daniel', 'Moira', 'Tessa', 'Fiona',
+        'Google UK English Female', 'Google UK English Male', 'Google US English',
+        'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Guy',
+        'Enhanced', 'Premium', 'Natural'
+      ];
+      const sorted = [...allVoices].sort((a, b) => {
+        const aIdx = premiumOrder.findIndex(p => a.name.includes(p));
+        const bIdx = premiumOrder.findIndex(p => b.name.includes(p));
+        const aScore = aIdx >= 0 ? premiumOrder.length - aIdx : -1;
+        const bScore = bIdx >= 0 ? premiumOrder.length - bIdx : -1;
+        return bScore - aScore;
+      });
+      setVoices(sorted);
+      if (sorted.length && !voice) setVoice(sorted[0]);
+    };
+    loadVoices();
+    speechSynthesis.onvoiceschanged = loadVoices;
+  }, []);
+
+  useEffect(() => {
+    let indices = deck.cards.map((_, i) => i);
+    if (filter === 'favorites') {
+      indices = indices.filter(i => favorites[deck.cards[i].front]);
+    }
+    if (shuffled && indices.length > 0) {
+      for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+      }
+    }
+    setOrder(indices.length > 0 ? indices : deck.cards.map((_, i) => i));
+    setCardIndex(0);
+    setShowAnswer(false);
+  }, [shuffled, filter, favorites]);
+
+  useEffect(() => { saveData(`progress_${deck.id}`, progress); }, [progress]);
+  useEffect(() => { saveData(`favorites_${deck.id}`, favorites); }, [favorites]);
+
+  useEffect(() => {
+    return () => {
+      speechSynthesis.cancel();
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: card?.front?.slice(0, 60) || 'FlashLearn',
+        artist: deck.name,
+        album: `Card ${cardIndex + 1} of ${order.length}`,
+      });
+      navigator.mediaSession.setActionHandler('play', handlePlay);
+      navigator.mediaSession.setActionHandler('pause', handleStop);
+      navigator.mediaSession.setActionHandler('nexttrack', handleNext);
+      navigator.mediaSession.setActionHandler('previoustrack', handlePrev);
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    }
+  }, [card, cardIndex, isPlaying]);
+
+  const speak = (text) => {
+    return new Promise((resolve) => {
+      speechSynthesis.cancel();
+      const processed = text
+        .replace(/\. /g, '. <break> ')
+        .replace(/\? /g, '? <break> ')
+        .replace(/: /g, ': <break> ')
+        .replace(/, /g, ', ')
+        .replace(/\band\b/gi, ', and')
+        .replace(/<break>/g, '...');
+      const utterance = new SpeechSynthesisUtterance(processed);
+      utterance.rate = speed;
+      utterance.pitch = 1.05;
+      utterance.volume = 1.0;
+      if (voice) utterance.voice = voice;
+      utterance.onend = () => resolve();
+      utterance.onerror = () => resolve();
+      utteranceRef.current = utterance;
+      speechSynthesis.speak(utterance);
+    });
+  };
+
+  const handleReplay = () => {
+    const wasPlaying = isPlayingRef.current;
+    handleStop();
+    setShowAnswer(false);
+    setTimeout(() => {
+      if (wasPlaying) {
+        setIsPlaying(true);
+        isPlayingRef.current = true;
+        runAutoPlay(cardIndex, true);
+      } else {
+        speak("Question... " + card.front);
+      }
+    }, 100);
+  };
+
+  const runAutoPlay = async (startIndex, startWithQuestion = true) => {
+    let idx = startIndex;
+    let doQuestion = startWithQuestion;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      osc.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.01);
+    } catch(e) {}
+
+    while (true) {
+      if (!isPlayingRef.current) break;
+      const currentCard = deck.cards[order[idx]];
+      if (doQuestion) {
+        setCardIndex(idx);
+        setShowAnswer(false);
+        setPhase('speaking-q');
+        await speak("Question... " + currentCard.front);
+        if (!isPlayingRef.current) break;
+        setPhase('pause-after-q');
+        await new Promise(r => timerRef.current = setTimeout(r, 1500));
+        if (!isPlayingRef.current) break;
+      }
+      setShowAnswer(true);
+      setPhase('speaking-a');
+      await speak("Answer... " + currentCard.back);
+      if (!isPlayingRef.current) break;
+      setPhase('pause-after-a');
+      await new Promise(r => timerRef.current = setTimeout(r, 2500));
+      if (!isPlayingRef.current) break;
+      idx = (idx + 1) % order.length;
+      doQuestion = true;
+    }
+    setPhase('idle');
+  };
+
+  const isPlayingRef = useRef(false);
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+
+  const handlePlay = () => {
+    setIsPlaying(true);
+    isPlayingRef.current = true;
+    runAutoPlay(cardIndex, !showAnswer);
+  };
+
+  const handleStop = () => {
+    isPlayingRef.current = false;
+    setIsPlaying(false);
+    speechSynthesis.cancel();
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setPhase('idle');
+  };
+
+  const handleNext = () => {
+    const wasPlaying = isPlayingRef.current;
+    handleStop();
+    const nextIdx = (cardIndex + 1) % order.length;
+    setCardIndex(nextIdx);
+    setShowAnswer(false);
+    if (wasPlaying) {
+      setTimeout(() => {
+        setIsPlaying(true);
+        isPlayingRef.current = true;
+        runAutoPlay(nextIdx, true);
+      }, 100);
+    }
+  };
+
+  const handlePrev = () => {
+    const wasPlaying = isPlayingRef.current;
+    handleStop();
+    const prevIdx = (cardIndex - 1 + order.length) % order.length;
+    setCardIndex(prevIdx);
+    setShowAnswer(false);
+    if (wasPlaying) {
+      setTimeout(() => {
+        setIsPlaying(true);
+        isPlayingRef.current = true;
+        runAutoPlay(prevIdx, true);
+      }, 100);
+    }
+  };
+
+  const handleFlip = () => {
+    if (!isPlaying) {
+      setShowAnswer(!showAnswer);
+    }
+  };
+
+  const markCard = (status) => {
+    setProgress(p => ({ ...p, [card.front]: status }));
+  };
+
+  const toggleFavorite = () => {
+    setFavorites(f => {
+      const newFavs = { ...f };
+      if (newFavs[card.front]) {
+        delete newFavs[card.front];
+      } else {
+        newFavs[card.front] = true;
+      }
+      return newFavs;
+    });
+  };
+
+  const isFavorite = () => favorites[card?.front];
+  const getStatus = () => progress[card?.front];
+  const favCount = Object.keys(favorites).length;
+
+  const renderSource = (source) => {
+    if (!source) return null;
+    const isUrl = source.startsWith('http://') || source.startsWith('https://');
+    return (
+      <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '11px', color: '#64748b' }}>
+        Source: {isUrl
+          ? <a href={source} target="_blank" rel="noopener noreferrer"
+               style={{ color: '#64748b', textDecoration: 'underline' }}
+               onClick={(e) => e.stopPropagation()}>
+              {source}
+            </a>
+          : source
+        }
+      </div>
+    );
+  };
+
+  const containerStyle = {
+    minHeight: '100vh',
+    background: 'linear-gradient(to bottom, #0f172a, #1e293b)',
+    padding: '16px',
+    fontFamily: 'system-ui',
+    color: '#e2e8f0'
+  };
+
+  const cardStyle = {
+    position: 'relative',
+    background: showAnswer
+      ? 'linear-gradient(135deg, #064e3b, #065f46)'
+      : 'linear-gradient(135deg, #1e3a5f, #1e40af)',
+    borderRadius: '20px',
+    padding: '24px',
+    minHeight: '260px',
+    display: 'flex',
+    flexDirection: 'column',
+    cursor: isPlaying ? 'default' : 'pointer',
+    border: showAnswer ? '2px solid #10b981' : '2px solid #3b82f6',
+    transition: 'all 0.3s ease'
+  };
+
+  return (
+    <div style={containerStyle}>
+      <div style={{ maxWidth: '500px', margin: '0 auto' }}>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <button onClick={() => { handleStop(); setView('home'); }}
+            style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '12px', padding: '12px 20px', color: '#94a3b8', fontSize: '16px', cursor: 'pointer' }}>
+            {'\u2190'} Back
+          </button>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ color: '#f1f5f9', fontWeight: 600 }}>Card {cardIndex + 1} / {order.length}</div>
+            <div style={{ color: '#64748b', fontSize: '13px' }}>{knownCount} mastered {'\u2022'} {favCount} favorited</div>
+          </div>
+          <div style={{ width: '80px' }}></div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+          <button
+            onClick={() => setFilter('all')}
+            style={{
+              flex: 1, padding: '10px', borderRadius: '10px', border: 'none', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+              background: filter === 'all' ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.05)',
+              color: filter === 'all' ? '#60a5fa' : '#64748b'
+            }}>
+            All Cards ({deck.cards.length})
+          </button>
+          <button
+            onClick={() => setFilter('favorites')}
+            style={{
+              flex: 1, padding: '10px', borderRadius: '10px', border: 'none', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+              background: filter === 'favorites' ? 'rgba(251,191,36,0.3)' : 'rgba(255,255,255,0.05)',
+              color: filter === 'favorites' ? '#fbbf24' : '#64748b'
+            }}>
+            {'\u2605'} Favorites ({favCount})
+          </button>
+        </div>
+
+        {filter === 'favorites' && favCount === 0 && (
+          <div style={{ background: 'rgba(30,41,59,0.8)', borderRadius: '16px', padding: '40px 24px', textAlign: 'center', marginBottom: '16px' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>{'\u2605'}</div>
+            <h3 style={{ color: '#f1f5f9', marginBottom: '8px' }}>No favorites yet</h3>
+            <p style={{ color: '#64748b', fontSize: '14px' }}>Tap the star on any card to add it to your favorites for quick review</p>
+            <button
+              onClick={() => setFilter('all')}
+              style={{ marginTop: '16px', padding: '12px 24px', borderRadius: '10px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 600, cursor: 'pointer' }}>
+              View All Cards
+            </button>
+          </div>
+        )}
+
+        {(filter !== 'favorites' || favCount > 0) && (
+          <>
+
+        {isPlaying && (
+          <div style={{ background: 'rgba(16,185,129,0.2)', borderRadius: '12px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#10b981', animation: 'pulse 1.5s infinite' }}></div>
+            <span style={{ color: '#10b981', fontWeight: 500 }}>
+              {phase === 'speaking-q' && 'Reading question...'}
+              {phase === 'pause-after-q' && 'Get ready for answer...'}
+              {phase === 'speaking-a' && 'Reading answer...'}
+              {phase === 'pause-after-a' && 'Moving to next card...'}
+            </span>
+          </div>
+        )}
+
+        <div style={cardStyle} onClick={handleFlip}>
+          <button
+            onClick={(e) => { e.stopPropagation(); toggleFavorite(); }}
+            style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', fontSize: '28px', cursor: 'pointer', padding: '4px', filter: isFavorite() ? 'none' : 'grayscale(100%)', opacity: isFavorite() ? 1 : 0.4, transition: 'all 0.2s' }}>
+            {'\u2605'}
+          </button>
+
+          <div style={{ fontSize: '11px', fontWeight: 700, color: showAnswer ? '#6ee7b7' : '#93c5fd', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>
+            {card?.category} {'\u2022'} {showAnswer ? 'ANSWER' : 'QUESTION'}
+          </div>
+
+          <div style={{ flex: 1, fontSize: showAnswer ? '16px' : '20px', lineHeight: 1.6, color: '#f1f5f9' }}>
+            {showAnswer ? card?.back : card?.front}
+          </div>
+
+          {renderSource(card?.source)}
+
+          {!isPlaying && (
+            <div style={{ marginTop: '12px', color: showAnswer ? '#6ee7b7' : '#93c5fd', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              Tap to {showAnswer ? 'see question' : 'reveal answer'}
+              {getStatus() && (
+                <span style={{
+                  padding: '4px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
+                  background: getStatus() === 'known' ? 'rgba(16,185,129,0.3)' : 'rgba(251,191,36,0.3)',
+                  color: getStatus() === 'known' ? '#6ee7b7' : '#fbbf24'
+                }}>
+                  {getStatus() === 'known' ? '\u2713 Mastered' : '\u25CB Learning'}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {!isPlaying && (
+          <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+            <button onClick={() => markCard('learning')}
+              style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
+                background: getStatus() === 'learning' ? '#f59e0b' : 'rgba(255,255,255,0.1)',
+                color: getStatus() === 'learning' ? 'white' : '#94a3b8'
+              }}>
+              Still Learning
+            </button>
+            <button onClick={() => markCard('known')}
+              style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
+                background: getStatus() === 'known' ? '#10b981' : 'rgba(255,255,255,0.1)',
+                color: getStatus() === 'known' ? 'white' : '#94a3b8'
+              }}>
+              Got It {'\u2713'}
+            </button>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px' }}>
+          <button onClick={handlePrev}
+            style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '2px solid rgba(255,255,255,0.2)', color: '#e2e8f0', fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {'\u2039'}
+          </button>
+
+          <button onClick={handleReplay} title="Replay this card"
+            style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(251,191,36,0.2)', border: '2px solid rgba(251,191,36,0.4)', color: '#fbbf24', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {'\u21BA'}
+          </button>
+
+          <button onClick={isPlaying ? handleStop : handlePlay}
+            style={{
+              width: '80px', height: '80px', borderRadius: '50%',
+              background: isPlaying ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #10b981, #059669)',
+              border: 'none', color: 'white', fontSize: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: isPlaying ? '0 0 30px rgba(239,68,68,0.5)' : '0 0 30px rgba(16,185,129,0.5)'
+            }}>
+            {isPlaying ? '\u23F9' : '\u25B6'}
+          </button>
+
+          <button onClick={handleNext}
+            style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '2px solid rgba(255,255,255,0.2)', color: '#e2e8f0', fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {'\u203A'}
+          </button>
+        </div>
+        </>
+        )}
+
+        <div style={{ marginTop: '24px', background: 'rgba(30,41,59,0.8)', borderRadius: '16px', padding: '20px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center', alignItems: 'center' }}>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#94a3b8', fontSize: '13px' }}>Voice</span>
+              <select
+                value={voice?.name || ''}
+                onChange={e => setVoice(voices.find(v => v.name === e.target.value))}
+                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px 12px', color: '#e2e8f0', fontSize: '13px', maxWidth: '140px' }}>
+                {voices.map(v => (
+                  <option key={v.name} value={v.name}>
+                    {v.name.replace('Microsoft ', '').replace('Google ', '').slice(0, 18)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#94a3b8', fontSize: '13px' }}>Speed</span>
+              <select
+                value={speed}
+                onChange={e => setSpeed(parseFloat(e.target.value))}
+                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px 12px', color: '#e2e8f0', fontSize: '13px' }}>
+                <option value={0.8}>Slow</option>
+                <option value={0.9}>Natural</option>
+                <option value={1.0}>Normal</option>
+                <option value={1.1}>Fast</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#94a3b8', fontSize: '13px' }}>Shuffle</span>
+              <button
+                onClick={() => setShuffled(!shuffled)}
+                style={{ width: '50px', height: '28px', borderRadius: '14px', border: 'none', background: shuffled ? '#3b82f6' : 'rgba(255,255,255,0.1)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s' }}>
+                <div style={{ position: 'absolute', top: '2px', left: shuffled ? '24px' : '2px', width: '24px', height: '24px', borderRadius: '50%', background: 'white', transition: 'left 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}></div>
+              </button>
+            </div>
+          </div>
+
+          <p style={{ textAlign: 'center', color: '#64748b', fontSize: '12px', marginTop: '16px', marginBottom: 0 }}>
+            {'\u{1F3A7}'} Headphone controls supported {'\u2022'} {'\u21BA'} Replay current card
+          </p>
+          <p style={{ textAlign: 'center', color: '#4b5563', fontSize: '11px', marginTop: '8px', marginBottom: 0 }}>
+            Tip: "Samantha" or "Karen" on iPhone sound most natural
+          </p>
+        </div>
+      </div>
+
+      <style>{\`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(0.9); }
+        }
+      \`}</style>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
