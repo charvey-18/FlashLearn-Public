@@ -1460,22 +1460,27 @@ function RevisionPlanner() {
                     const color = getSubjectColor(session.subject);
                     const style = getSessionStyle(session);
                     const isDragging = dragSession?.id === session.id;
+                    const isCompact = (session.duration || 60) <= 30;
                     return (
-                      <div key={session.id} style={{ position: 'absolute', left: 0, right: 0, ...style, background: color.bg, borderLeft: `3px solid ${color.dot}`, borderRadius: '4px', cursor: isDragging ? 'grabbing' : 'grab', opacity: isDragging ? 0.9 : 1, boxShadow: isDragging ? '0 4px 12px rgba(0,0,0,0.3)' : 'none', zIndex: isDragging ? 10 : 1, transition: isDragging ? 'none' : 'box-shadow 0.2s', overflow: 'hidden' }}>
-                        {/* Resize handle top */}
-                        <div onMouseDown={(e) => handleDragStart(e, session, 'resize-top')} onTouchStart={(e) => handleDragStart(e, session, 'resize-top')} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '6px', cursor: 'ns-resize', background: 'transparent' }} />
-
-                        {/* Main drag area */}
-                        <div onMouseDown={(e) => handleDragStart(e, session, 'move')} onTouchStart={(e) => handleDragStart(e, session, 'move')} style={{ padding: '4px 8px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                          <div style={{ color: color.text, fontWeight: 500, fontSize: '10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{subj?.icon} {subj?.name}</div>
-                          <div style={{ color: color.text, opacity: 0.7, fontSize: '9px' }}>{session.startTime} • {session.duration}m</div>
+                      <div key={session.id} style={{ position: 'absolute', left: 0, right: 0, ...style, background: color.bg, borderLeft: `3px solid ${color.dot}`, borderRadius: '4px', cursor: isDragging ? 'grabbing' : 'grab', opacity: isDragging ? 0.9 : 1, boxShadow: isDragging ? '0 4px 12px rgba(0,0,0,0.3)' : 'none', zIndex: isDragging ? 10 : 1, transition: isDragging ? 'none' : 'box-shadow 0.2s', overflow: 'visible' }}>
+                        {/* Resize handle top with circle indicator */}
+                        <div onMouseDown={(e) => handleDragStart(e, session, 'resize-top')} onTouchStart={(e) => handleDragStart(e, session, 'resize-top')} style={{ position: 'absolute', top: '-4px', left: 0, right: 0, height: '12px', cursor: 'ns-resize', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: color.dot, border: `2px solid ${color.bg}`, boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
                         </div>
 
-                        {/* Resize handle bottom */}
-                        <div onMouseDown={(e) => handleDragStart(e, session, 'resize-bottom')} onTouchStart={(e) => handleDragStart(e, session, 'resize-bottom')} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '6px', cursor: 'ns-resize', background: 'transparent' }} />
+                        {/* Main drag area - horizontal layout for compact (30min), vertical for longer */}
+                        <div onMouseDown={(e) => handleDragStart(e, session, 'move')} onTouchStart={(e) => handleDragStart(e, session, 'move')} style={{ padding: isCompact ? '3px 8px' : '4px 8px', height: '100%', display: 'flex', flexDirection: isCompact ? 'row' : 'column', justifyContent: isCompact ? 'space-between' : 'center', alignItems: isCompact ? 'center' : 'flex-start', gap: isCompact ? '8px' : '0' }}>
+                          <div style={{ color: color.text, fontWeight: 500, fontSize: '10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: isCompact ? 1 : 'none', minWidth: 0 }}>{subj?.icon} {subj?.name}</div>
+                          <div style={{ color: color.text, opacity: 0.7, fontSize: '9px', whiteSpace: 'nowrap', flexShrink: 0 }}>{session.startTime || '09:00'}{isCompact ? '' : ` • ${session.duration || 60}m`}</div>
+                        </div>
 
-                        {/* Delete button */}
-                        <button onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }} style={{ position: 'absolute', top: '2px', right: '4px', background: 'none', border: 'none', color: color.text, opacity: 0.5, cursor: 'pointer', fontSize: '12px', padding: '2px' }}>×</button>
+                        {/* Resize handle bottom with circle indicator */}
+                        <div onMouseDown={(e) => handleDragStart(e, session, 'resize-bottom')} onTouchStart={(e) => handleDragStart(e, session, 'resize-bottom')} style={{ position: 'absolute', bottom: '-4px', left: 0, right: 0, height: '12px', cursor: 'ns-resize', display: 'flex', justifyContent: 'center', alignItems: 'flex-end' }}>
+                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: color.dot, border: `2px solid ${color.bg}`, boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                        </div>
+
+                        {/* Delete button - positioned to not overlap with compact layout */}
+                        <button onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }} style={{ position: 'absolute', top: isCompact ? '50%' : '2px', right: '2px', transform: isCompact ? 'translateY(-50%)' : 'none', background: 'rgba(0,0,0,0.1)', border: 'none', borderRadius: '50%', width: '16px', height: '16px', color: color.text, opacity: 0.6, cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                       </div>
                     );
                   })}
