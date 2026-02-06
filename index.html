@@ -1595,9 +1595,9 @@ function RevisionPlanner() {
                         </div>
 
                         {/* Main drag area - horizontal layout for compact (30min), vertical for longer */}
-                        <div onMouseDown={(e) => handleDragStart(e, session, 'move')} onTouchStart={(e) => handleDragStart(e, session, 'move')} style={{ padding: isCompact ? '3px 8px' : '4px 8px', height: '100%', display: 'flex', flexDirection: isCompact ? 'row' : 'column', justifyContent: isCompact ? 'space-between' : 'center', alignItems: isCompact ? 'center' : 'flex-start', gap: isCompact ? '8px' : '0' }}>
-                          <div style={{ color: color.text, fontWeight: 500, fontSize: '10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: isCompact ? 1 : 'none', minWidth: 0 }}>{subj?.icon} {subj?.name}</div>
-                          <div style={{ color: color.text, opacity: 0.7, fontSize: '9px', whiteSpace: 'nowrap', flexShrink: 0 }}>{session.startTime || '09:00'}{isCompact ? '' : ` • ${session.duration || 60}m`}</div>
+                        <div onMouseDown={(e) => handleDragStart(e, session, 'move')} onTouchStart={(e) => handleDragStart(e, session, 'move')} style={{ padding: isCompact ? '3px 8px 3px 8px' : '4px 8px', paddingRight: '22px', height: '100%', display: 'flex', flexDirection: isCompact ? 'row' : 'column', justifyContent: 'flex-start', alignItems: isCompact ? 'center' : 'flex-start', gap: isCompact ? '6px' : '0' }}>
+                          <div style={{ color: color.text, fontWeight: 500, fontSize: '10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: isCompact ? '60%' : 'none' }}>{subj?.icon} {subj?.name}</div>
+                          <div style={{ color: color.text, opacity: 0.7, fontSize: '9px', whiteSpace: 'nowrap' }}>{session.startTime || '09:00'}{isCompact ? '' : ` • ${session.duration || 60}m`}</div>
                         </div>
 
                         {/* Resize handle bottom with circle indicator */}
