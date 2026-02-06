@@ -1233,17 +1233,106 @@ function RevisionPlanner() {
     });
   };
 
-  // Hour slots for day view (6am to 10pm)
-  const hourSlots = Array.from({ length: 17 }, (_, i) => i + 6);
+  // Time slots for day view (6am to 10pm in 30-min intervals)
+  const timeSlots = Array.from({ length: 33 }, (_, i) => {
+    const hour = Math.floor(i / 2) + 6;
+    const mins = (i % 2) * 30;
+    return { hour, mins, label: `${hour.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}` };
+  });
 
-  const getSessionsForHour = (hour) => {
-    return getSessionsForDate(selectedDate).filter(s => {
-      if (!s.startTime) return false;
-      const startHour = parseInt(s.startTime.split(':')[0]);
-      const endHour = startHour + Math.ceil(s.duration / 60);
-      return hour >= startHour && hour < endHour;
-    });
+  // Convert time string to minutes from midnight
+  const timeToMins = (timeStr) => {
+    const [h, m] = timeStr.split(':').map(Number);
+    return h * 60 + m;
   };
+
+  // Convert minutes from midnight to time string
+  const minsToTime = (mins) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  };
+
+  // Get session position and height for timeline
+  const getSessionStyle = (session) => {
+    const startMins = timeToMins(session.startTime);
+    const dayStartMins = 6 * 60; // 6am
+    const top = ((startMins - dayStartMins) / 30) * 28; // 28px per 30-min slot
+    const height = (session.duration / 30) * 28;
+    return { top: `${top}px`, height: `${Math.max(height, 20)}px` };
+  };
+
+  // Dragging state
+  const [dragSession, setDragSession] = useState(null);
+  const [dragType, setDragType] = useState(null); // 'move', 'resize-top', 'resize-bottom'
+  const [dragStartY, setDragStartY] = useState(0);
+  const [dragStartTime, setDragStartTime] = useState(0);
+  const [dragStartDuration, setDragStartDuration] = useState(0);
+  const timelineRef = useRef(null);
+
+  const handleDragStart = (e, session, type) => {
+    e.preventDefault();
+    setDragSession(session);
+    setDragType(type);
+    setDragStartY(e.clientY || e.touches?.[0]?.clientY);
+    setDragStartTime(timeToMins(session.startTime));
+    setDragStartDuration(session.duration);
+  };
+
+  const handleDragMove = (e) => {
+    if (!dragSession || !timelineRef.current) return;
+    const clientY = e.clientY || e.touches?.[0]?.clientY;
+    const deltaY = clientY - dragStartY;
+    const deltaMins = Math.round(deltaY / 28) * 30; // Snap to 30-min intervals
+
+    const updated = sessions.map(s => {
+      if (s.id !== dragSession.id) return s;
+
+      if (dragType === 'move') {
+        let newStartMins = dragStartTime + deltaMins;
+        newStartMins = Math.max(6 * 60, Math.min(22 * 60 - s.duration, newStartMins)); // Clamp to 6am-10pm
+        return { ...s, startTime: minsToTime(newStartMins) };
+      } else if (dragType === 'resize-bottom') {
+        let newDuration = dragStartDuration + deltaMins;
+        newDuration = Math.max(30, Math.min(180, newDuration)); // 30min to 3h
+        return { ...s, duration: newDuration };
+      } else if (dragType === 'resize-top') {
+        let newStartMins = dragStartTime + deltaMins;
+        let newDuration = dragStartDuration - deltaMins;
+        if (newDuration < 30) { newDuration = 30; newStartMins = dragStartTime + dragStartDuration - 30; }
+        if (newDuration > 180) { newDuration = 180; newStartMins = dragStartTime + dragStartDuration - 180; }
+        newStartMins = Math.max(6 * 60, newStartMins);
+        return { ...s, startTime: minsToTime(newStartMins), duration: newDuration };
+      }
+      return s;
+    });
+    setSessions(updated);
+  };
+
+  const handleDragEnd = () => {
+    if (dragSession) {
+      saveRevisionSessions(sessions);
+    }
+    setDragSession(null);
+    setDragType(null);
+  };
+
+  useEffect(() => {
+    if (dragSession) {
+      const moveHandler = (e) => handleDragMove(e);
+      const endHandler = () => handleDragEnd();
+      window.addEventListener('mousemove', moveHandler);
+      window.addEventListener('mouseup', endHandler);
+      window.addEventListener('touchmove', moveHandler);
+      window.addEventListener('touchend', endHandler);
+      return () => {
+        window.removeEventListener('mousemove', moveHandler);
+        window.removeEventListener('mouseup', endHandler);
+        window.removeEventListener('touchmove', moveHandler);
+        window.removeEventListener('touchend', endHandler);
+      };
+    }
+  }, [dragSession, dragStartY, dragStartTime, dragStartDuration, dragType]);
 
   return (
     <div style={{ padding: '16px', color: '#e2e8f0', fontFamily: 'system-ui' }}>
@@ -1251,9 +1340,9 @@ function RevisionPlanner() {
 
       {/* View Toggle */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', marginBottom: '16px' }}>
-        {['calendar', 'day', 'metrics', 'pomodoro'].map(mode => (
-          <button key={mode} onClick={() => setViewMode(mode)} style={{ padding: '6px 4px', borderRadius: '6px', border: 'none', fontSize: '10px', fontWeight: 500, cursor: 'pointer', background: viewMode === mode ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.05)', color: viewMode === mode ? '#a78bfa' : '#64748b' }}>
-            {mode === 'calendar' ? '📅' : mode === 'day' ? '⏰' : mode === 'metrics' ? '📊' : '🍅'}
+        {[{ id: 'calendar', label: 'Month' }, { id: 'day', label: 'Day' }, { id: 'metrics', label: 'Stats' }, { id: 'pomodoro', label: 'Timer' }].map(({ id, label }) => (
+          <button key={id} onClick={() => setViewMode(id)} style={{ padding: '8px 4px', borderRadius: '6px', border: 'none', fontSize: '11px', fontWeight: 500, cursor: 'pointer', background: viewMode === id ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.05)', color: viewMode === id ? '#a78bfa' : '#64748b' }}>
+            {label}
           </button>
         ))}
       </div>
@@ -1316,30 +1405,57 @@ function RevisionPlanner() {
             <button onClick={() => setSelectedDate(new Date(new Date(selectedDate).getTime() + 86400000).toISOString().split('T')[0])} style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', fontSize: '16px' }}>›</button>
           </div>
 
-          {/* Hourly Timeline */}
-          <div style={{ maxHeight: '320px', overflowY: 'auto', marginBottom: '12px' }}>
-            {hourSlots.map(hour => {
-              const hourSessions = getSessionsForHour(hour);
-              return (
-                <div key={hour} style={{ display: 'flex', borderBottom: '1px solid rgba(100,116,139,0.1)', minHeight: '40px' }}>
-                  <div style={{ width: '40px', fontSize: '10px', color: '#64748b', padding: '4px 0', textAlign: 'right', paddingRight: '8px' }}>
-                    {hour.toString().padStart(2, '0')}:00
+          <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '8px', textAlign: 'center' }}>Drag sessions to move • Drag edges to resize</div>
+
+          {/* Timeline with 30-min slots */}
+          <div ref={timelineRef} style={{ maxHeight: '340px', overflowY: 'auto', marginBottom: '12px', position: 'relative' }}>
+            {/* Time grid */}
+            <div style={{ display: 'flex' }}>
+              {/* Time labels */}
+              <div style={{ width: '36px', flexShrink: 0 }}>
+                {timeSlots.filter((_, i) => i % 2 === 0).map((slot, i) => (
+                  <div key={i} style={{ height: '56px', fontSize: '9px', color: '#64748b', textAlign: 'right', paddingRight: '6px', paddingTop: '2px' }}>
+                    {slot.label}
                   </div>
-                  <div style={{ flex: 1, padding: '2px 0', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    {hourSessions.map(session => {
-                      const subj = subjects.find(s => s.id === session.subject);
-                      const color = getSubjectColor(session.subject);
-                      return (
-                        <div key={session.id} style={{ background: color.bg, borderLeft: `3px solid ${color.dot}`, borderRadius: '4px', padding: '4px 8px', fontSize: '10px' }}>
-                          <div style={{ color: color.text, fontWeight: 500 }}>{subj?.icon} {subj?.name}</div>
-                          <div style={{ color: color.text, opacity: 0.7, fontSize: '9px' }}>{session.startTime} - {session.duration}m</div>
+                ))}
+              </div>
+
+              {/* Grid and sessions */}
+              <div style={{ flex: 1, position: 'relative', borderLeft: '1px solid rgba(100,116,139,0.2)' }}>
+                {/* Grid lines */}
+                {timeSlots.map((slot, i) => (
+                  <div key={i} style={{ height: '28px', borderBottom: slot.mins === 0 ? '1px solid rgba(100,116,139,0.2)' : '1px solid rgba(100,116,139,0.08)' }} />
+                ))}
+
+                {/* Sessions overlay */}
+                <div style={{ position: 'absolute', top: 0, left: '4px', right: '4px', bottom: 0 }}>
+                  {getSessionsForDate(selectedDate).map(session => {
+                    const subj = subjects.find(s => s.id === session.subject);
+                    const color = getSubjectColor(session.subject);
+                    const style = getSessionStyle(session);
+                    const isDragging = dragSession?.id === session.id;
+                    return (
+                      <div key={session.id} style={{ position: 'absolute', left: 0, right: 0, ...style, background: color.bg, borderLeft: `3px solid ${color.dot}`, borderRadius: '4px', cursor: isDragging ? 'grabbing' : 'grab', opacity: isDragging ? 0.9 : 1, boxShadow: isDragging ? '0 4px 12px rgba(0,0,0,0.3)' : 'none', zIndex: isDragging ? 10 : 1, transition: isDragging ? 'none' : 'box-shadow 0.2s', overflow: 'hidden' }}>
+                        {/* Resize handle top */}
+                        <div onMouseDown={(e) => handleDragStart(e, session, 'resize-top')} onTouchStart={(e) => handleDragStart(e, session, 'resize-top')} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '6px', cursor: 'ns-resize', background: 'transparent' }} />
+
+                        {/* Main drag area */}
+                        <div onMouseDown={(e) => handleDragStart(e, session, 'move')} onTouchStart={(e) => handleDragStart(e, session, 'move')} style={{ padding: '4px 8px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                          <div style={{ color: color.text, fontWeight: 500, fontSize: '10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{subj?.icon} {subj?.name}</div>
+                          <div style={{ color: color.text, opacity: 0.7, fontSize: '9px' }}>{session.startTime} • {session.duration}m</div>
                         </div>
-                      );
-                    })}
-                  </div>
+
+                        {/* Resize handle bottom */}
+                        <div onMouseDown={(e) => handleDragStart(e, session, 'resize-bottom')} onTouchStart={(e) => handleDragStart(e, session, 'resize-bottom')} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '6px', cursor: 'ns-resize', background: 'transparent' }} />
+
+                        {/* Delete button */}
+                        <button onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }} style={{ position: 'absolute', top: '2px', right: '4px', background: 'none', border: 'none', color: color.text, opacity: 0.5, cursor: 'pointer', fontSize: '12px', padding: '2px' }}>×</button>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            </div>
           </div>
 
           <button onClick={() => { setNewSession({ ...newSession, date: selectedDate }); setShowAddSession(true); }} style={{ width: '100%', background: '#8b5cf6', border: 'none', borderRadius: '8px', padding: '10px', color: 'white', fontSize: '12px', fontWeight: 500, cursor: 'pointer' }}>+ Add Session</button>
