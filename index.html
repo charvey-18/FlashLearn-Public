@@ -466,13 +466,31 @@ const getRevisionSessions = () => loadLocal('revisionSessions', []);
 const saveRevisionSessions = (sessions) => saveLocal('revisionSessions', sessions);
 const getExamCountdownHidden = () => loadLocal('examCountdownHidden', false);
 const saveExamCountdownHidden = (hidden) => saveLocal('examCountdownHidden', hidden);
+const getPomodoroSettings = () => loadLocal('pomodoroSettings', { workMins: 25, shortBreak: 5, longBreak: 15, sessionsBeforeLong: 4 });
+const savePomodoroSettings = (settings) => saveLocal('pomodoroSettings', settings);
+
+// Subject colors - soft pastel palette
+const SUBJECT_COLORS = {
+  'gcse-maths': { bg: '#dbeafe', text: '#1e40af', dot: '#3b82f6' },
+  'gcse-biology': { bg: '#dcfce7', text: '#166534', dot: '#22c55e' },
+  'gcse-chemistry': { bg: '#fef3c7', text: '#92400e', dot: '#f59e0b' },
+  'gcse-physics': { bg: '#e0e7ff', text: '#3730a3', dot: '#6366f1' },
+  'gcse-eng-lit': { bg: '#fce7f3', text: '#9d174d', dot: '#ec4899' },
+  'gcse-eng-lang': { bg: '#ffe4e6', text: '#9f1239', dot: '#f43f5e' },
+  'gcse-history': { bg: '#fed7aa', text: '#9a3412', dot: '#f97316' },
+  'gcse-dt': { bg: '#d1d5db', text: '#374151', dot: '#6b7280' },
+  'finance': { bg: '#d1fae5', text: '#065f46', dot: '#10b981' },
+  'default': { bg: '#e2e8f0', text: '#475569', dot: '#64748b' }
+};
+
+const getSubjectColor = (subjectId) => SUBJECT_COLORS[subjectId] || SUBJECT_COLORS['default'];
 
 // Get subjects from folder structure
 const getSubjectsFromFolders = () => {
   const subjects = [];
   const extractSubjects = (folder, parent = '') => {
     if (folder.deckIds && folder.deckIds.length > 0) {
-      subjects.push({ id: folder.id, name: folder.name, icon: folder.icon, parent });
+      subjects.push({ id: folder.id, name: folder.name, icon: folder.icon, parent, color: getSubjectColor(folder.id) });
     }
     if (folder.children) {
       folder.children.forEach(child => extractSubjects(child, folder.name));
@@ -625,9 +643,9 @@ function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakDa
           </div>
         </div>
 
-        {/* Next Exam Countdown Banner */}
+        {/* Next Exam Countdown Banner - Soft pastel colors */}
         {nextExam && path.length === 0 && (
-          <div style={{ background: hideExamCountdown ? 'rgba(30,41,59,0.9)' : (nextExam.daysUntil <= 7 ? 'linear-gradient(135deg, #dc2626, #b91c1c)' : nextExam.daysUntil <= 30 ? 'linear-gradient(135deg, #d97706, #b45309)' : 'linear-gradient(135deg, #059669, #047857)'), borderRadius: '12px', padding: hideExamCountdown ? '12px 16px' : '16px', marginBottom: '16px', border: hideExamCountdown ? '1px solid rgba(100,116,139,0.2)' : 'none' }}>
+          <div style={{ background: hideExamCountdown ? 'rgba(30,41,59,0.9)' : (nextExam.daysUntil <= 7 ? '#fecaca' : nextExam.daysUntil <= 30 ? '#fef3c7' : '#d1fae5'), borderRadius: '12px', padding: hideExamCountdown ? '12px 16px' : '16px', marginBottom: '16px', border: hideExamCountdown ? '1px solid rgba(100,116,139,0.2)' : (nextExam.daysUntil <= 7 ? '1px solid #fca5a5' : nextExam.daysUntil <= 30 ? '1px solid #fcd34d' : '1px solid #6ee7b7') }}>
             {hideExamCountdown ? (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ color: '#64748b', fontSize: '13px' }}>Exam countdown hidden</span>
@@ -636,15 +654,15 @@ function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakDa
             ) : (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '2px' }}>Next exam</div>
-                  <div style={{ fontSize: '16px', fontWeight: 600, color: 'white' }}>{nextExam.subject}</div>
+                  <div style={{ fontSize: '13px', color: nextExam.daysUntil <= 7 ? '#991b1b' : nextExam.daysUntil <= 30 ? '#92400e' : '#065f46', marginBottom: '2px', opacity: 0.8 }}>Next exam</div>
+                  <div style={{ fontSize: '16px', fontWeight: 600, color: nextExam.daysUntil <= 7 ? '#991b1b' : nextExam.daysUntil <= 30 ? '#92400e' : '#065f46' }}>{nextExam.subject}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '28px', fontWeight: 700, color: 'white' }}>{nextExam.daysUntil}</div>
-                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.8)' }}>days left</div>
+                    <div style={{ fontSize: '28px', fontWeight: 700, color: nextExam.daysUntil <= 7 ? '#dc2626' : nextExam.daysUntil <= 30 ? '#d97706' : '#059669' }}>{nextExam.daysUntil}</div>
+                    <div style={{ fontSize: '11px', color: nextExam.daysUntil <= 7 ? '#991b1b' : nextExam.daysUntil <= 30 ? '#92400e' : '#065f46', opacity: 0.8 }}>days left</div>
                   </div>
-                  <button onClick={toggleExamCountdown} style={{ background: 'rgba(0,0,0,0.2)', border: 'none', borderRadius: '6px', padding: '6px 10px', color: 'rgba(255,255,255,0.7)', fontSize: '11px', cursor: 'pointer' }}>Hide</button>
+                  <button onClick={toggleExamCountdown} style={{ background: nextExam.daysUntil <= 7 ? 'rgba(153,27,27,0.1)' : nextExam.daysUntil <= 30 ? 'rgba(146,64,14,0.1)' : 'rgba(6,95,70,0.1)', border: 'none', borderRadius: '6px', padding: '6px 10px', color: nextExam.daysUntil <= 7 ? '#991b1b' : nextExam.daysUntil <= 30 ? '#92400e' : '#065f46', fontSize: '11px', cursor: 'pointer' }}>Hide</button>
                 </div>
               </div>
             )}
@@ -1086,8 +1104,11 @@ function RevisionPlanner() {
   const [sessions, setSessions] = useState(getRevisionSessions);
   const [showAddSession, setShowAddSession] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [newSession, setNewSession] = useState({ subject: '', date: '', duration: 60, notes: '' });
-  const [viewMode, setViewMode] = useState('calendar'); // 'calendar' or 'metrics'
+  const [newSession, setNewSession] = useState({ subject: '', date: '', startTime: '09:00', duration: 60, notes: '' });
+  const [viewMode, setViewMode] = useState('calendar'); // 'calendar', 'day', 'metrics', 'pomodoro'
+  const [pomodoroState, setPomodoroState] = useState({ isRunning: false, mode: 'work', timeLeft: 25 * 60, sessionsCompleted: 0 });
+  const [pomodoroSettings, setPomodoroSettingsState] = useState(getPomodoroSettings);
+  const pomodoroRef = useRef(null);
   const subjects = getSubjectsFromFolders();
 
   // Calendar helpers
@@ -1104,7 +1125,7 @@ function RevisionPlanner() {
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const monthDays = getMonthDays(currentMonth);
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   const getSessionsForDate = (dateStr) => sessions.filter(s => s.date === dateStr);
 
@@ -1113,12 +1134,19 @@ function RevisionPlanner() {
     return d.toISOString().split('T')[0];
   };
 
+  // Get unique subject colors for a date (for calendar dots)
+  const getSubjectDotsForDate = (dateStr) => {
+    const daySessions = getSessionsForDate(dateStr);
+    const uniqueSubjects = [...new Set(daySessions.map(s => s.subject))];
+    return uniqueSubjects.slice(0, 4).map(subjectId => getSubjectColor(subjectId).dot);
+  };
+
   const addSession = () => {
     if (!newSession.subject || !newSession.date) return;
     const updated = [...sessions, { ...newSession, id: Date.now() }];
     setSessions(updated);
     saveRevisionSessions(updated);
-    setNewSession({ subject: '', date: '', duration: 60, notes: '' });
+    setNewSession({ subject: '', date: selectedDate, startTime: '09:00', duration: 60, notes: '' });
     setShowAddSession(false);
   };
 
@@ -1148,166 +1176,304 @@ function RevisionPlanner() {
 
   const metrics = getMetrics();
 
+  // Pomodoro Timer Logic
+  useEffect(() => {
+    if (pomodoroState.isRunning) {
+      pomodoroRef.current = setInterval(() => {
+        setPomodoroState(prev => {
+          if (prev.timeLeft <= 1) {
+            // Play notification sound
+            try {
+              const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQQFA0+W7Pa2bBIAC0Ka8f7JfigEADN+9f/dgzwEACRz9v/fhj8HACR18//adDsHACVy7PTYdjoLACVy6uvQcTgOACZy4+PLbzYQACdy3N3IbTQSAChy1dfGbDITAClzzNHDbDEUACpzy8zBazAVACp0xcfAajAWACt1wMO/aTAXACx2u7+9aTAYAC13t7u8aTAYAC54s7e6aDEYAC94r7S5aDEYADB5q7G4ZzEYADF6qK+3ZzIYADF6pa22ZzIYADJ7oqu1ZjMYADJ7oKm0ZjMYADN8naezZjQXADN8m6WyZjQXADR9mKOxZTUWADR9lqGwZTUWADV9lKCvZDYWADV+kp6uZDYWADZ+kJytZDcVADZ+jputZDcVADd/jJmsYzgUADd/ipesYzgUADiAiJarYjkUADiAhpSqYjkUADmAhJOpYToTADmAg5GoYToTADqBgZCnYDsTADqBf46mYDsTADuBfo2lXzwSADuBfIukXzwSADyCe4qjXj0RADyCeYmiXj0RAD2CeIihXT4RAD2Cd4egXT4RAD6DdoafXD8QAD6DdYWeXD8QAD+DdISdWz8QAD+Dc4OcWz8QAECEcoGbWkAPAECEcYCaWkAPAEGEcH+ZWUEPAEGEb36YWUEPAEKEbn2XWEEOAEKEbXyWWEEOAA==');
+              audio.play();
+            } catch(e) {}
+
+            // Switch mode
+            if (prev.mode === 'work') {
+              const newSessions = prev.sessionsCompleted + 1;
+              const isLongBreak = newSessions % pomodoroSettings.sessionsBeforeLong === 0;
+              return {
+                isRunning: false,
+                mode: isLongBreak ? 'longBreak' : 'shortBreak',
+                timeLeft: (isLongBreak ? pomodoroSettings.longBreak : pomodoroSettings.shortBreak) * 60,
+                sessionsCompleted: newSessions
+              };
+            } else {
+              return {
+                isRunning: false,
+                mode: 'work',
+                timeLeft: pomodoroSettings.workMins * 60,
+                sessionsCompleted: prev.sessionsCompleted
+              };
+            }
+          }
+          return { ...prev, timeLeft: prev.timeLeft - 1 };
+        });
+      }, 1000);
+    }
+    return () => clearInterval(pomodoroRef.current);
+  }, [pomodoroState.isRunning, pomodoroSettings]);
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const togglePomodoro = () => setPomodoroState(prev => ({ ...prev, isRunning: !prev.isRunning }));
+  const resetPomodoro = () => setPomodoroState({ isRunning: false, mode: 'work', timeLeft: pomodoroSettings.workMins * 60, sessionsCompleted: 0 });
+  const skipPhase = () => {
+    setPomodoroState(prev => {
+      if (prev.mode === 'work') {
+        const newSessions = prev.sessionsCompleted + 1;
+        const isLongBreak = newSessions % pomodoroSettings.sessionsBeforeLong === 0;
+        return { isRunning: false, mode: isLongBreak ? 'longBreak' : 'shortBreak', timeLeft: (isLongBreak ? pomodoroSettings.longBreak : pomodoroSettings.shortBreak) * 60, sessionsCompleted: newSessions };
+      }
+      return { isRunning: false, mode: 'work', timeLeft: pomodoroSettings.workMins * 60, sessionsCompleted: prev.sessionsCompleted };
+    });
+  };
+
+  // Hour slots for day view (6am to 10pm)
+  const hourSlots = Array.from({ length: 17 }, (_, i) => i + 6);
+
+  const getSessionsForHour = (hour) => {
+    return getSessionsForDate(selectedDate).filter(s => {
+      if (!s.startTime) return false;
+      const startHour = parseInt(s.startTime.split(':')[0]);
+      const endHour = startHour + Math.ceil(s.duration / 60);
+      return hour >= startHour && hour < endHour;
+    });
+  };
+
   return (
     <div style={{ padding: '16px', color: '#e2e8f0', fontFamily: 'system-ui' }}>
       <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', color: '#f1f5f9' }}>📅 Revision Planner</h2>
 
       {/* View Toggle */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        <button onClick={() => setViewMode('calendar')} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: 500, cursor: 'pointer', background: viewMode === 'calendar' ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.05)', color: viewMode === 'calendar' ? '#a78bfa' : '#64748b' }}>Calendar</button>
-        <button onClick={() => setViewMode('metrics')} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: 500, cursor: 'pointer', background: viewMode === 'metrics' ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.05)', color: viewMode === 'metrics' ? '#a78bfa' : '#64748b' }}>Metrics</button>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', marginBottom: '16px' }}>
+        {['calendar', 'day', 'metrics', 'pomodoro'].map(mode => (
+          <button key={mode} onClick={() => setViewMode(mode)} style={{ padding: '6px 4px', borderRadius: '6px', border: 'none', fontSize: '10px', fontWeight: 500, cursor: 'pointer', background: viewMode === mode ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.05)', color: viewMode === mode ? '#a78bfa' : '#64748b' }}>
+            {mode === 'calendar' ? '📅' : mode === 'day' ? '⏰' : mode === 'metrics' ? '📊' : '🍅'}
+          </button>
+        ))}
       </div>
 
-      {viewMode === 'calendar' ? (
+      {viewMode === 'calendar' && (
         <>
           {/* Month Navigation */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))} style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', fontSize: '18px' }}>‹</button>
-            <span style={{ fontWeight: 500 }}>{monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}</span>
-            <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))} style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', fontSize: '18px' }}>›</button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))} style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', fontSize: '16px' }}>‹</button>
+            <span style={{ fontWeight: 500, fontSize: '13px' }}>{monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}</span>
+            <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))} style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', fontSize: '16px' }}>›</button>
           </div>
 
-          {/* Calendar Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '16px' }}>
+          {/* Calendar Grid with Colored Dots */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '12px' }}>
             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-              <div key={i} style={{ textAlign: 'center', fontSize: '10px', color: '#64748b', padding: '4px' }}>{d}</div>
+              <div key={i} style={{ textAlign: 'center', fontSize: '9px', color: '#64748b', padding: '2px' }}>{d}</div>
             ))}
             {monthDays.map((day, i) => {
               if (!day) return <div key={i} />;
               const dateStr = formatDateStr(day);
-              const daySessions = getSessionsForDate(dateStr);
               const isToday = dateStr === new Date().toISOString().split('T')[0];
               const isSelected = dateStr === selectedDate;
-              const totalMins = daySessions.reduce((a, s) => a + s.duration, 0);
+              const subjectDots = getSubjectDotsForDate(dateStr);
               return (
-                <div key={i} onClick={() => setSelectedDate(dateStr)} style={{ textAlign: 'center', padding: '6px 2px', borderRadius: '6px', cursor: 'pointer', background: isSelected ? 'rgba(139,92,246,0.3)' : isToday ? 'rgba(59,130,246,0.2)' : 'transparent', border: isToday ? '1px solid #3b82f6' : '1px solid transparent' }}>
-                  <div style={{ fontSize: '12px', fontWeight: isToday ? 600 : 400 }}>{day}</div>
-                  {totalMins > 0 && <div style={{ fontSize: '9px', color: '#a78bfa', marginTop: '2px' }}>{Math.round(totalMins / 60)}h</div>}
+                <div key={i} onClick={() => { setSelectedDate(dateStr); setViewMode('day'); }} style={{ textAlign: 'center', padding: '4px 2px', borderRadius: '6px', cursor: 'pointer', background: isSelected ? 'rgba(139,92,246,0.3)' : isToday ? 'rgba(59,130,246,0.2)' : 'transparent', border: isToday ? '1px solid #3b82f6' : '1px solid transparent', minHeight: '36px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: isToday ? 600 : 400 }}>{day}</div>
+                  {subjectDots.length > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '2px', marginTop: '2px', flexWrap: 'wrap' }}>
+                      {subjectDots.map((color, j) => (
+                        <div key={j} style={{ width: '5px', height: '5px', borderRadius: '50%', background: color }} />
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
 
-          {/* Selected Date Sessions */}
-          <div style={{ marginBottom: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '13px', color: '#94a3b8' }}>{new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-              <button onClick={() => { setNewSession({ ...newSession, date: selectedDate }); setShowAddSession(true); }} style={{ background: '#8b5cf6', border: 'none', borderRadius: '6px', padding: '6px 12px', color: 'white', fontSize: '11px', cursor: 'pointer' }}>+ Add</button>
-            </div>
-
-            {getSessionsForDate(selectedDate).length === 0 ? (
-              <div style={{ background: 'rgba(30,41,59,0.5)', borderRadius: '8px', padding: '16px', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>No sessions planned</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {getSessionsForDate(selectedDate).map(session => {
-                  const subj = subjects.find(s => s.id === session.subject);
-                  return (
-                    <div key={session.id} style={{ background: 'rgba(30,41,59,0.8)', borderRadius: '8px', padding: '12px', border: '1px solid rgba(139,92,246,0.2)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <div style={{ fontSize: '14px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>{subj?.icon || '📚'}</span>
-                            <span>{subj?.name || session.subject}</span>
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#a78bfa', marginTop: '4px' }}>{session.duration} mins</div>
-                          {session.notes && <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>{session.notes}</div>}
-                        </div>
-                        <button onClick={() => deleteSession(session.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px' }}>×</button>
-                      </div>
-                    </div>
-                  );
-                })}
+          {/* Subject Legend */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+            {subjects.slice(0, 6).map(s => (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '9px', color: '#94a3b8' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.color.dot }} />
+                {s.name.slice(0, 8)}
               </div>
-            )}
+            ))}
           </div>
 
-          {/* Add Session Modal */}
-          {showAddSession && (
-            <div style={{ background: 'rgba(30,41,59,0.95)', borderRadius: '12px', padding: '16px', marginBottom: '12px', border: '1px solid rgba(139,92,246,0.3)' }}>
-              <h3 style={{ fontSize: '14px', marginBottom: '12px' }}>Add Study Session</h3>
-              <select value={newSession.subject} onChange={e => setNewSession({ ...newSession, subject: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', marginBottom: '10px', fontSize: '13px' }}>
-                <option value="">Select subject...</option>
-                {subjects.map(s => (
-                  <option key={s.id} value={s.id}>{s.icon} {s.name}</option>
-                ))}
-              </select>
-              <input type="date" value={newSession.date} onChange={e => setNewSession({ ...newSession, date: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', marginBottom: '10px', fontSize: '13px' }} />
-              <select value={newSession.duration} onChange={e => setNewSession({ ...newSession, duration: parseInt(e.target.value) })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', marginBottom: '10px', fontSize: '13px' }}>
-                <option value={15}>15 mins</option>
-                <option value={30}>30 mins</option>
-                <option value={45}>45 mins</option>
-                <option value={60}>1 hour</option>
-                <option value={90}>1.5 hours</option>
-                <option value={120}>2 hours</option>
-                <option value={180}>3 hours</option>
-              </select>
-              <input placeholder="Notes (optional)" value={newSession.notes} onChange={e => setNewSession({ ...newSession, notes: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', marginBottom: '10px', fontSize: '13px' }} />
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => setShowAddSession(false)} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'transparent', color: '#94a3b8', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
-                <button onClick={addSession} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: '#8b5cf6', color: 'white', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Add Session</button>
-              </div>
-            </div>
-          )}
+          <button onClick={() => { setNewSession({ ...newSession, date: selectedDate }); setShowAddSession(true); }} style={{ width: '100%', background: '#8b5cf6', border: 'none', borderRadius: '8px', padding: '10px', color: 'white', fontSize: '12px', fontWeight: 500, cursor: 'pointer' }}>+ Add Session</button>
         </>
-      ) : (
-        /* Metrics View */
+      )}
+
+      {viewMode === 'day' && (
+        <>
+          {/* Date Navigation */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <button onClick={() => setSelectedDate(new Date(new Date(selectedDate).getTime() - 86400000).toISOString().split('T')[0])} style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', fontSize: '16px' }}>‹</button>
+            <span style={{ fontWeight: 500, fontSize: '13px' }}>{new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+            <button onClick={() => setSelectedDate(new Date(new Date(selectedDate).getTime() + 86400000).toISOString().split('T')[0])} style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', fontSize: '16px' }}>›</button>
+          </div>
+
+          {/* Hourly Timeline */}
+          <div style={{ maxHeight: '320px', overflowY: 'auto', marginBottom: '12px' }}>
+            {hourSlots.map(hour => {
+              const hourSessions = getSessionsForHour(hour);
+              return (
+                <div key={hour} style={{ display: 'flex', borderBottom: '1px solid rgba(100,116,139,0.1)', minHeight: '40px' }}>
+                  <div style={{ width: '40px', fontSize: '10px', color: '#64748b', padding: '4px 0', textAlign: 'right', paddingRight: '8px' }}>
+                    {hour.toString().padStart(2, '0')}:00
+                  </div>
+                  <div style={{ flex: 1, padding: '2px 0', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {hourSessions.map(session => {
+                      const subj = subjects.find(s => s.id === session.subject);
+                      const color = getSubjectColor(session.subject);
+                      return (
+                        <div key={session.id} style={{ background: color.bg, borderLeft: `3px solid ${color.dot}`, borderRadius: '4px', padding: '4px 8px', fontSize: '10px' }}>
+                          <div style={{ color: color.text, fontWeight: 500 }}>{subj?.icon} {subj?.name}</div>
+                          <div style={{ color: color.text, opacity: 0.7, fontSize: '9px' }}>{session.startTime} - {session.duration}m</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <button onClick={() => { setNewSession({ ...newSession, date: selectedDate }); setShowAddSession(true); }} style={{ width: '100%', background: '#8b5cf6', border: 'none', borderRadius: '8px', padding: '10px', color: 'white', fontSize: '12px', fontWeight: 500, cursor: 'pointer' }}>+ Add Session</button>
+        </>
+      )}
+
+      {viewMode === 'metrics' && (
         <div>
           {/* Summary Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
-            <div style={{ background: 'rgba(139,92,246,0.15)', borderRadius: '10px', padding: '14px', border: '1px solid rgba(139,92,246,0.3)' }}>
-              <div style={{ fontSize: '24px', fontWeight: 700, color: '#a78bfa' }}>{metrics.totalHours.toFixed(1)}h</div>
-              <div style={{ fontSize: '11px', color: '#94a3b8' }}>Total planned</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+            <div style={{ background: 'rgba(139,92,246,0.15)', borderRadius: '8px', padding: '12px', border: '1px solid rgba(139,92,246,0.3)' }}>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#a78bfa' }}>{metrics.totalHours.toFixed(1)}h</div>
+              <div style={{ fontSize: '10px', color: '#94a3b8' }}>Total planned</div>
             </div>
-            <div style={{ background: 'rgba(59,130,246,0.15)', borderRadius: '10px', padding: '14px', border: '1px solid rgba(59,130,246,0.3)' }}>
-              <div style={{ fontSize: '24px', fontWeight: 700, color: '#60a5fa' }}>{metrics.weekHours.toFixed(1)}h</div>
-              <div style={{ fontSize: '11px', color: '#94a3b8' }}>This week</div>
+            <div style={{ background: 'rgba(59,130,246,0.15)', borderRadius: '8px', padding: '12px', border: '1px solid rgba(59,130,246,0.3)' }}>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#60a5fa' }}>{metrics.weekHours.toFixed(1)}h</div>
+              <div style={{ fontSize: '10px', color: '#94a3b8' }}>This week</div>
             </div>
           </div>
 
-          {/* Today's Sessions */}
-          <div style={{ marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '8px' }}>Today's Sessions</h3>
-            {metrics.todaySessions.length === 0 ? (
-              <div style={{ background: 'rgba(30,41,59,0.5)', borderRadius: '8px', padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>No sessions today</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {metrics.todaySessions.map(s => {
-                  const subj = subjects.find(sub => sub.id === s.subject);
-                  return (
-                    <div key={s.id} style={{ background: 'rgba(30,41,59,0.8)', borderRadius: '8px', padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '13px' }}>{subj?.icon} {subj?.name}</span>
-                      <span style={{ fontSize: '12px', color: '#a78bfa' }}>{s.duration}m</span>
+          {/* Hours by Subject with colored bars */}
+          <h3 style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '8px' }}>Hours by Subject</h3>
+          {Object.keys(metrics.subjectHours).length === 0 ? (
+            <div style={{ background: 'rgba(30,41,59,0.5)', borderRadius: '8px', padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '11px' }}>No sessions planned yet</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {Object.entries(metrics.subjectHours).sort((a, b) => b[1] - a[1]).map(([subjectId, hours]) => {
+                const subj = subjects.find(s => s.id === subjectId);
+                const color = getSubjectColor(subjectId);
+                const percent = metrics.totalHours > 0 ? (hours / metrics.totalHours) * 100 : 0;
+                return (
+                  <div key={subjectId} style={{ background: 'rgba(30,41,59,0.8)', borderRadius: '6px', padding: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: color.dot }} />
+                        {subj?.name || subjectId}
+                      </span>
+                      <span style={{ fontSize: '11px', color: color.dot, fontWeight: 600 }}>{hours.toFixed(1)}h</span>
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                    <div style={{ height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
+                      <div style={{ width: `${percent}%`, height: '100%', background: color.dot, borderRadius: '2px' }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {viewMode === 'pomodoro' && (
+        <div style={{ textAlign: 'center' }}>
+          {/* Timer Display */}
+          <div style={{ background: pomodoroState.mode === 'work' ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)', borderRadius: '16px', padding: '24px', marginBottom: '16px', border: `2px solid ${pomodoroState.mode === 'work' ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}` }}>
+            <div style={{ fontSize: '11px', color: pomodoroState.mode === 'work' ? '#fca5a5' : '#86efac', textTransform: 'uppercase', marginBottom: '8px', fontWeight: 600 }}>
+              {pomodoroState.mode === 'work' ? '🍅 Focus Time' : pomodoroState.mode === 'shortBreak' ? '☕ Short Break' : '🌴 Long Break'}
+            </div>
+            <div style={{ fontSize: '48px', fontWeight: 700, color: pomodoroState.mode === 'work' ? '#f87171' : '#4ade80', fontFamily: 'monospace' }}>
+              {formatTime(pomodoroState.timeLeft)}
+            </div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '8px' }}>
+              Sessions completed: {pomodoroState.sessionsCompleted}
+            </div>
           </div>
 
-          {/* Hours by Subject */}
-          <div>
-            <h3 style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '8px' }}>Hours by Subject</h3>
-            {Object.keys(metrics.subjectHours).length === 0 ? (
-              <div style={{ background: 'rgba(30,41,59,0.5)', borderRadius: '8px', padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>No sessions planned yet</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {Object.entries(metrics.subjectHours).sort((a, b) => b[1] - a[1]).map(([subjectId, hours]) => {
-                  const subj = subjects.find(s => s.id === subjectId);
-                  const percent = metrics.totalHours > 0 ? (hours / metrics.totalHours) * 100 : 0;
-                  return (
-                    <div key={subjectId} style={{ background: 'rgba(30,41,59,0.8)', borderRadius: '8px', padding: '10px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '13px' }}>{subj?.icon || '📚'} {subj?.name || subjectId}</span>
-                        <span style={{ fontSize: '12px', color: '#a78bfa', fontWeight: 600 }}>{hours.toFixed(1)}h</span>
-                      </div>
-                      <div style={{ height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
-                        <div style={{ width: `${percent}%`, height: '100%', background: '#8b5cf6', borderRadius: '2px' }} />
-                      </div>
-                    </div>
-                  );
-                })}
+          {/* Controls */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            <button onClick={togglePomodoro} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: pomodoroState.isRunning ? '#ef4444' : '#22c55e', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
+              {pomodoroState.isRunning ? '⏸ Pause' : '▶ Start'}
+            </button>
+            <button onClick={skipPhase} style={{ padding: '12px', borderRadius: '10px', border: '1px solid rgba(100,116,139,0.3)', background: 'transparent', color: '#94a3b8', fontSize: '14px', cursor: 'pointer' }}>⏭</button>
+            <button onClick={resetPomodoro} style={{ padding: '12px', borderRadius: '10px', border: '1px solid rgba(100,116,139,0.3)', background: 'transparent', color: '#94a3b8', fontSize: '14px', cursor: 'pointer' }}>↺</button>
+          </div>
+
+          {/* Settings */}
+          <div style={{ background: 'rgba(30,41,59,0.8)', borderRadius: '10px', padding: '12px', textAlign: 'left' }}>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '8px' }}>Timer Settings</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div>
+                <label style={{ fontSize: '10px', color: '#64748b' }}>Work (mins)</label>
+                <input type="number" value={pomodoroSettings.workMins} onChange={e => { const v = { ...pomodoroSettings, workMins: parseInt(e.target.value) || 25 }; setPomodoroSettingsState(v); savePomodoroSettings(v); if (!pomodoroState.isRunning && pomodoroState.mode === 'work') setPomodoroState(p => ({ ...p, timeLeft: v.workMins * 60 })); }} style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '12px' }} />
               </div>
-            )}
+              <div>
+                <label style={{ fontSize: '10px', color: '#64748b' }}>Short break</label>
+                <input type="number" value={pomodoroSettings.shortBreak} onChange={e => { const v = { ...pomodoroSettings, shortBreak: parseInt(e.target.value) || 5 }; setPomodoroSettingsState(v); savePomodoroSettings(v); }} style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '12px' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '10px', color: '#64748b' }}>Long break</label>
+                <input type="number" value={pomodoroSettings.longBreak} onChange={e => { const v = { ...pomodoroSettings, longBreak: parseInt(e.target.value) || 15 }; setPomodoroSettingsState(v); savePomodoroSettings(v); }} style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '12px' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '10px', color: '#64748b' }}>Sessions</label>
+                <input type="number" value={pomodoroSettings.sessionsBeforeLong} onChange={e => { const v = { ...pomodoroSettings, sessionsBeforeLong: parseInt(e.target.value) || 4 }; setPomodoroSettingsState(v); savePomodoroSettings(v); }} style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '12px' }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Session Modal */}
+      {showAddSession && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
+          <div style={{ background: '#1e293b', borderRadius: '12px', padding: '20px', maxWidth: '320px', width: '100%', border: '1px solid rgba(139,92,246,0.3)' }}>
+            <h3 style={{ fontSize: '16px', marginBottom: '16px', color: '#f1f5f9' }}>Add Study Session</h3>
+            <select value={newSession.subject} onChange={e => setNewSession({ ...newSession, subject: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', marginBottom: '10px', fontSize: '13px' }}>
+              <option value="">Select subject...</option>
+              {subjects.map(s => (
+                <option key={s.id} value={s.id}>{s.icon} {s.name}</option>
+              ))}
+            </select>
+            <input type="date" value={newSession.date} onChange={e => setNewSession({ ...newSession, date: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', marginBottom: '10px', fontSize: '13px' }} />
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Start time</label>
+                <input type="time" value={newSession.startTime} onChange={e => setNewSession({ ...newSession, startTime: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '13px' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Duration</label>
+                <select value={newSession.duration} onChange={e => setNewSession({ ...newSession, duration: parseInt(e.target.value) })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '13px' }}>
+                  <option value={15}>15m</option>
+                  <option value={30}>30m</option>
+                  <option value={45}>45m</option>
+                  <option value={60}>1h</option>
+                  <option value={90}>1.5h</option>
+                  <option value={120}>2h</option>
+                  <option value={180}>3h</option>
+                </select>
+              </div>
+            </div>
+            <input placeholder="Notes (optional)" value={newSession.notes} onChange={e => setNewSession({ ...newSession, notes: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', marginBottom: '16px', fontSize: '13px' }} />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowAddSession(false)} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'transparent', color: '#94a3b8', fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={addSession} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: '#8b5cf6', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Add</button>
+            </div>
           </div>
         </div>
       )}
