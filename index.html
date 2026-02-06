@@ -461,6 +461,27 @@ const saveStreakData = (data) => saveLocal('streakData', data);
 const getExams = () => loadLocal('exams', []);
 const saveExams = (exams) => saveLocal('exams', exams);
 
+// REVISION PLANNER
+const getRevisionSessions = () => loadLocal('revisionSessions', []);
+const saveRevisionSessions = (sessions) => saveLocal('revisionSessions', sessions);
+const getExamCountdownHidden = () => loadLocal('examCountdownHidden', false);
+const saveExamCountdownHidden = (hidden) => saveLocal('examCountdownHidden', hidden);
+
+// Get subjects from folder structure
+const getSubjectsFromFolders = () => {
+  const subjects = [];
+  const extractSubjects = (folder, parent = '') => {
+    if (folder.deckIds && folder.deckIds.length > 0) {
+      subjects.push({ id: folder.id, name: folder.name, icon: folder.icon, parent });
+    }
+    if (folder.children) {
+      folder.children.forEach(child => extractSubjects(child, folder.name));
+    }
+  };
+  FOLDERS.forEach(f => extractSubjects(f));
+  return subjects;
+};
+
 // APP
 function App() {
   const { user, loading } = useAuth();
@@ -469,6 +490,7 @@ function App() {
   const [activeDeck, setActiveDeck] = useState(null);
   const [openaiKey, setOpenaiKey] = useState(() => loadLocal('openai_api_key', ''));
   const [streakData, setStreakData] = useState(getStreakData);
+  const [showPlanner, setShowPlanner] = useState(false);
 
   if (loading) {
     return <div style={{ minHeight: '100vh', background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ color: '#60a5fa', fontSize: '18px' }}>Loading...</div></div>;
@@ -480,13 +502,57 @@ function App() {
   if (view === 'create') return <CreateDeck setView={setView} openaiKey={openaiKey} user={user} />;
   if (view === 'exams') return <ExamCountdown setView={setView} />;
 
-  return <Home path={path} setPath={setPath} setActiveDeck={setActiveDeck} setView={setView} user={user} openaiKey={openaiKey} streakData={streakData} />;
+  return <HomeWithPlanner path={path} setPath={setPath} setActiveDeck={setActiveDeck} setView={setView} user={user} openaiKey={openaiKey} streakData={streakData} showPlanner={showPlanner} setShowPlanner={setShowPlanner} />;
+}
+
+// HOME WITH PLANNER SIDEBAR
+function HomeWithPlanner({ path, setPath, setActiveDeck, setView, user, openaiKey, streakData, showPlanner, setShowPlanner }) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 900);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 900);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #0f172a, #1e293b)', display: 'flex' }}>
+      {/* Main Content */}
+      <div style={{ flex: 1, minWidth: 0, padding: '20px', fontFamily: 'system-ui' }}>
+        <Home path={path} setPath={setPath} setActiveDeck={setActiveDeck} setView={setView} user={user} openaiKey={openaiKey} streakData={streakData} showPlanner={showPlanner} setShowPlanner={setShowPlanner} isMobile={isMobile} />
+      </div>
+
+      {/* Planner Sidebar - Desktop */}
+      {!isMobile && (
+        <div style={{ width: '340px', borderLeft: '1px solid rgba(100,116,139,0.2)', background: 'rgba(15,23,42,0.9)', overflowY: 'auto', maxHeight: '100vh' }}>
+          <RevisionPlanner />
+        </div>
+      )}
+
+      {/* Planner Modal - Mobile */}
+      {isMobile && showPlanner && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ width: '100%', maxWidth: '400px', background: '#0f172a', overflowY: 'auto', animation: 'slideIn 0.2s ease' }}>
+            <div style={{ padding: '16px', borderBottom: '1px solid rgba(100,116,139,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ color: '#f1f5f9', fontSize: '18px' }}>Revision Planner</h2>
+              <button onClick={() => setShowPlanner(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '24px', cursor: 'pointer' }}>×</button>
+            </div>
+            <RevisionPlanner />
+          </div>
+        </div>
+      )}
+
+      <style>{`@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
+    </div>
+  );
 }
 
 // HOME WITH FOLDERS
-function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakData }) {
+function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakData, showPlanner, setShowPlanner, isMobile }) {
   const { signOut } = useAuth();
   const [showApiModal, setShowApiModal] = useState(false);
+  const [exams, setExamsLocal] = useState(getExams);
+  const [hideExamCountdown, setHideExamCountdown] = useState(getExamCountdownHidden);
 
   // Get current folder based on path
   const getCurrentFolder = () => {
@@ -518,8 +584,26 @@ function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakDa
     setView('study');
   };
 
+  // Get next upcoming exam
+  const getNextExam = () => {
+    const now = new Date();
+    const upcoming = exams
+      .map(e => ({ ...e, daysUntil: Math.ceil((new Date(e.date) - now) / (1000 * 60 * 60 * 24)) }))
+      .filter(e => e.daysUntil >= 0)
+      .sort((a, b) => a.daysUntil - b.daysUntil);
+    return upcoming[0] || null;
+  };
+
+  const nextExam = getNextExam();
+
+  const toggleExamCountdown = () => {
+    const newVal = !hideExamCountdown;
+    setHideExamCountdown(newVal);
+    saveExamCountdownHidden(newVal);
+  };
+
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #0f172a, #1e293b)', padding: '20px', fontFamily: 'system-ui' }}>
+    <div style={{ fontFamily: 'system-ui' }}>
       {showApiModal && <ApiKeyModal openaiKey={openaiKey} onClose={() => setShowApiModal(false)} />}
 
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
@@ -530,6 +614,9 @@ function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakDa
             <p style={{ color: '#64748b', fontSize: '13px' }}>{user ? `Welcome back` : 'GCSE Revision Made Easy'}</p>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
+            {isMobile && (
+              <button onClick={() => setShowPlanner(true)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(139,92,246,0.5)', background: 'rgba(139,92,246,0.1)', color: '#a78bfa', fontSize: '12px', cursor: 'pointer' }}>📅 Planner</button>
+            )}
             {user ? (
               <button onClick={signOut} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'transparent', color: '#94a3b8', fontSize: '12px', cursor: 'pointer' }}>Sign Out</button>
             ) : (
@@ -537,6 +624,32 @@ function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakDa
             )}
           </div>
         </div>
+
+        {/* Next Exam Countdown Banner */}
+        {nextExam && path.length === 0 && (
+          <div style={{ background: hideExamCountdown ? 'rgba(30,41,59,0.9)' : (nextExam.daysUntil <= 7 ? 'linear-gradient(135deg, #dc2626, #b91c1c)' : nextExam.daysUntil <= 30 ? 'linear-gradient(135deg, #d97706, #b45309)' : 'linear-gradient(135deg, #059669, #047857)'), borderRadius: '12px', padding: hideExamCountdown ? '12px 16px' : '16px', marginBottom: '16px', border: hideExamCountdown ? '1px solid rgba(100,116,139,0.2)' : 'none' }}>
+            {hideExamCountdown ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#64748b', fontSize: '13px' }}>Exam countdown hidden</span>
+                <button onClick={toggleExamCountdown} style={{ background: 'none', border: 'none', color: '#60a5fa', fontSize: '12px', cursor: 'pointer' }}>Show</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginBottom: '2px' }}>Next exam</div>
+                  <div style={{ fontSize: '16px', fontWeight: 600, color: 'white' }}>{nextExam.subject}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '28px', fontWeight: 700, color: 'white' }}>{nextExam.daysUntil}</div>
+                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.8)' }}>days left</div>
+                  </div>
+                  <button onClick={toggleExamCountdown} style={{ background: 'rgba(0,0,0,0.2)', border: 'none', borderRadius: '6px', padding: '6px 10px', color: 'rgba(255,255,255,0.7)', fontSize: '11px', cursor: 'pointer' }}>Hide</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Streak Banner */}
         <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', borderRadius: '12px', padding: '16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -964,6 +1077,240 @@ function QuizMode({ deck, setView }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// REVISION PLANNER SIDEBAR
+function RevisionPlanner() {
+  const [sessions, setSessions] = useState(getRevisionSessions);
+  const [showAddSession, setShowAddSession] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newSession, setNewSession] = useState({ subject: '', date: '', duration: 60, notes: '' });
+  const [viewMode, setViewMode] = useState('calendar'); // 'calendar' or 'metrics'
+  const subjects = getSubjectsFromFolders();
+
+  // Calendar helpers
+  const getMonthDays = (date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const days = [];
+    for (let i = 0; i < firstDay; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(i);
+    return days;
+  };
+
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const monthDays = getMonthDays(currentMonth);
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  const getSessionsForDate = (dateStr) => sessions.filter(s => s.date === dateStr);
+
+  const formatDateStr = (day) => {
+    const d = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    return d.toISOString().split('T')[0];
+  };
+
+  const addSession = () => {
+    if (!newSession.subject || !newSession.date) return;
+    const updated = [...sessions, { ...newSession, id: Date.now() }];
+    setSessions(updated);
+    saveRevisionSessions(updated);
+    setNewSession({ subject: '', date: '', duration: 60, notes: '' });
+    setShowAddSession(false);
+  };
+
+  const deleteSession = (id) => {
+    const updated = sessions.filter(s => s.id !== id);
+    setSessions(updated);
+    saveRevisionSessions(updated);
+  };
+
+  // Metrics calculation
+  const getMetrics = () => {
+    const subjectHours = {};
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    const weekSessions = sessions.filter(s => new Date(s.date) >= weekStart);
+
+    sessions.forEach(s => {
+      subjectHours[s.subject] = (subjectHours[s.subject] || 0) + (s.duration / 60);
+    });
+
+    const totalHours = Object.values(subjectHours).reduce((a, b) => a + b, 0);
+    const weekHours = weekSessions.reduce((a, s) => a + s.duration / 60, 0);
+    const todaySessions = sessions.filter(s => s.date === new Date().toISOString().split('T')[0]);
+
+    return { subjectHours, totalHours, weekHours, todaySessions };
+  };
+
+  const metrics = getMetrics();
+
+  return (
+    <div style={{ padding: '16px', color: '#e2e8f0', fontFamily: 'system-ui' }}>
+      <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', color: '#f1f5f9' }}>📅 Revision Planner</h2>
+
+      {/* View Toggle */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+        <button onClick={() => setViewMode('calendar')} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: 500, cursor: 'pointer', background: viewMode === 'calendar' ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.05)', color: viewMode === 'calendar' ? '#a78bfa' : '#64748b' }}>Calendar</button>
+        <button onClick={() => setViewMode('metrics')} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: 500, cursor: 'pointer', background: viewMode === 'metrics' ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.05)', color: viewMode === 'metrics' ? '#a78bfa' : '#64748b' }}>Metrics</button>
+      </div>
+
+      {viewMode === 'calendar' ? (
+        <>
+          {/* Month Navigation */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))} style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', fontSize: '18px' }}>‹</button>
+            <span style={{ fontWeight: 500 }}>{monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}</span>
+            <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))} style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', fontSize: '18px' }}>›</button>
+          </div>
+
+          {/* Calendar Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '16px' }}>
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+              <div key={i} style={{ textAlign: 'center', fontSize: '10px', color: '#64748b', padding: '4px' }}>{d}</div>
+            ))}
+            {monthDays.map((day, i) => {
+              if (!day) return <div key={i} />;
+              const dateStr = formatDateStr(day);
+              const daySessions = getSessionsForDate(dateStr);
+              const isToday = dateStr === new Date().toISOString().split('T')[0];
+              const isSelected = dateStr === selectedDate;
+              const totalMins = daySessions.reduce((a, s) => a + s.duration, 0);
+              return (
+                <div key={i} onClick={() => setSelectedDate(dateStr)} style={{ textAlign: 'center', padding: '6px 2px', borderRadius: '6px', cursor: 'pointer', background: isSelected ? 'rgba(139,92,246,0.3)' : isToday ? 'rgba(59,130,246,0.2)' : 'transparent', border: isToday ? '1px solid #3b82f6' : '1px solid transparent' }}>
+                  <div style={{ fontSize: '12px', fontWeight: isToday ? 600 : 400 }}>{day}</div>
+                  {totalMins > 0 && <div style={{ fontSize: '9px', color: '#a78bfa', marginTop: '2px' }}>{Math.round(totalMins / 60)}h</div>}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Selected Date Sessions */}
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#94a3b8' }}>{new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+              <button onClick={() => { setNewSession({ ...newSession, date: selectedDate }); setShowAddSession(true); }} style={{ background: '#8b5cf6', border: 'none', borderRadius: '6px', padding: '6px 12px', color: 'white', fontSize: '11px', cursor: 'pointer' }}>+ Add</button>
+            </div>
+
+            {getSessionsForDate(selectedDate).length === 0 ? (
+              <div style={{ background: 'rgba(30,41,59,0.5)', borderRadius: '8px', padding: '16px', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>No sessions planned</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {getSessionsForDate(selectedDate).map(session => {
+                  const subj = subjects.find(s => s.id === session.subject);
+                  return (
+                    <div key={session.id} style={{ background: 'rgba(30,41,59,0.8)', borderRadius: '8px', padding: '12px', border: '1px solid rgba(139,92,246,0.2)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <div style={{ fontSize: '14px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{subj?.icon || '📚'}</span>
+                            <span>{subj?.name || session.subject}</span>
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#a78bfa', marginTop: '4px' }}>{session.duration} mins</div>
+                          {session.notes && <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>{session.notes}</div>}
+                        </div>
+                        <button onClick={() => deleteSession(session.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px' }}>×</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Add Session Modal */}
+          {showAddSession && (
+            <div style={{ background: 'rgba(30,41,59,0.95)', borderRadius: '12px', padding: '16px', marginBottom: '12px', border: '1px solid rgba(139,92,246,0.3)' }}>
+              <h3 style={{ fontSize: '14px', marginBottom: '12px' }}>Add Study Session</h3>
+              <select value={newSession.subject} onChange={e => setNewSession({ ...newSession, subject: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', marginBottom: '10px', fontSize: '13px' }}>
+                <option value="">Select subject...</option>
+                {subjects.map(s => (
+                  <option key={s.id} value={s.id}>{s.icon} {s.name}</option>
+                ))}
+              </select>
+              <input type="date" value={newSession.date} onChange={e => setNewSession({ ...newSession, date: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', marginBottom: '10px', fontSize: '13px' }} />
+              <select value={newSession.duration} onChange={e => setNewSession({ ...newSession, duration: parseInt(e.target.value) })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', marginBottom: '10px', fontSize: '13px' }}>
+                <option value={15}>15 mins</option>
+                <option value={30}>30 mins</option>
+                <option value={45}>45 mins</option>
+                <option value={60}>1 hour</option>
+                <option value={90}>1.5 hours</option>
+                <option value={120}>2 hours</option>
+                <option value={180}>3 hours</option>
+              </select>
+              <input placeholder="Notes (optional)" value={newSession.notes} onChange={e => setNewSession({ ...newSession, notes: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', marginBottom: '10px', fontSize: '13px' }} />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => setShowAddSession(false)} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid rgba(100,116,139,0.3)', background: 'transparent', color: '#94a3b8', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={addSession} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: '#8b5cf6', color: 'white', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Add Session</button>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        /* Metrics View */
+        <div>
+          {/* Summary Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+            <div style={{ background: 'rgba(139,92,246,0.15)', borderRadius: '10px', padding: '14px', border: '1px solid rgba(139,92,246,0.3)' }}>
+              <div style={{ fontSize: '24px', fontWeight: 700, color: '#a78bfa' }}>{metrics.totalHours.toFixed(1)}h</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8' }}>Total planned</div>
+            </div>
+            <div style={{ background: 'rgba(59,130,246,0.15)', borderRadius: '10px', padding: '14px', border: '1px solid rgba(59,130,246,0.3)' }}>
+              <div style={{ fontSize: '24px', fontWeight: 700, color: '#60a5fa' }}>{metrics.weekHours.toFixed(1)}h</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8' }}>This week</div>
+            </div>
+          </div>
+
+          {/* Today's Sessions */}
+          <div style={{ marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '8px' }}>Today's Sessions</h3>
+            {metrics.todaySessions.length === 0 ? (
+              <div style={{ background: 'rgba(30,41,59,0.5)', borderRadius: '8px', padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>No sessions today</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {metrics.todaySessions.map(s => {
+                  const subj = subjects.find(sub => sub.id === s.subject);
+                  return (
+                    <div key={s.id} style={{ background: 'rgba(30,41,59,0.8)', borderRadius: '8px', padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '13px' }}>{subj?.icon} {subj?.name}</span>
+                      <span style={{ fontSize: '12px', color: '#a78bfa' }}>{s.duration}m</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Hours by Subject */}
+          <div>
+            <h3 style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '8px' }}>Hours by Subject</h3>
+            {Object.keys(metrics.subjectHours).length === 0 ? (
+              <div style={{ background: 'rgba(30,41,59,0.5)', borderRadius: '8px', padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>No sessions planned yet</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {Object.entries(metrics.subjectHours).sort((a, b) => b[1] - a[1]).map(([subjectId, hours]) => {
+                  const subj = subjects.find(s => s.id === subjectId);
+                  const percent = metrics.totalHours > 0 ? (hours / metrics.totalHours) * 100 : 0;
+                  return (
+                    <div key={subjectId} style={{ background: 'rgba(30,41,59,0.8)', borderRadius: '8px', padding: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '13px' }}>{subj?.icon || '📚'} {subj?.name || subjectId}</span>
+                        <span style={{ fontSize: '12px', color: '#a78bfa', fontWeight: 600 }}>{hours.toFixed(1)}h</span>
+                      </div>
+                      <div style={{ height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
+                        <div style={{ width: `${percent}%`, height: '100%', background: '#8b5cf6', borderRadius: '2px' }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
