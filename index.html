@@ -584,6 +584,129 @@ function HomeWithPlanner({ path, setPath, setActiveDeck, setView, user, openaiKe
   );
 }
 
+// FAVORITES SECTION
+function FavoritesSection({ setActiveDeck, setView }) {
+  const [expanded, setExpanded] = useState(() => loadLocal('favoritesExpanded', false));
+  const [expandedFolders, setExpandedFolders] = useState({});
+
+  // Collect all favorites from all decks, grouped by folder
+  const getFavoritesGrouped = () => {
+    const grouped = {};
+    let totalCount = 0;
+
+    // Helper to find which folder a deck belongs to
+    const findDeckFolder = (deckId) => {
+      for (const folder of FOLDERS) {
+        if (folder.deckIds?.includes(deckId)) return folder;
+        if (folder.children) {
+          for (const child of folder.children) {
+            if (child.deckIds?.includes(deckId)) return child;
+            if (child.children) {
+              for (const grandchild of child.children) {
+                if (grandchild.deckIds?.includes(deckId)) return grandchild;
+              }
+            }
+          }
+        }
+      }
+      return null;
+    };
+
+    // Go through all decks and collect favorites
+    Object.keys(DECKS).forEach(deckId => {
+      const deck = DECKS[deckId];
+      if (!deck.cards || deck.cards.length === 0) return;
+
+      const favorites = loadLocal(`favorites_${deckId}`, {});
+      const favCards = deck.cards.filter(card => favorites[card.front]);
+
+      if (favCards.length > 0) {
+        const folder = findDeckFolder(deckId);
+        const folderId = folder?.id || 'other';
+        const folderName = folder?.name || 'Other';
+        const folderIcon = folder?.icon || '📚';
+
+        if (!grouped[folderId]) {
+          grouped[folderId] = { name: folderName, icon: folderIcon, decks: {} };
+        }
+        grouped[folderId].decks[deckId] = { deck, cards: favCards };
+        totalCount += favCards.length;
+      }
+    });
+
+    return { grouped, totalCount };
+  };
+
+  const { grouped, totalCount } = getFavoritesGrouped();
+
+  const toggleExpanded = () => {
+    const newVal = !expanded;
+    setExpanded(newVal);
+    saveLocal('favoritesExpanded', newVal);
+  };
+
+  const toggleFolder = (folderId) => {
+    setExpandedFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
+  };
+
+  if (totalCount === 0) return null;
+
+  return (
+    <div style={{ marginBottom: '20px' }}>
+      {/* Header */}
+      <button onClick={toggleExpanded} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: '12px', cursor: 'pointer', marginBottom: expanded ? '12px' : 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '20px' }}>⭐</span>
+          <span style={{ color: '#fbbf24', fontWeight: 600, fontSize: '14px' }}>Favourites</span>
+          <span style={{ color: '#d97706', fontSize: '12px', background: 'rgba(251,191,36,0.2)', padding: '2px 8px', borderRadius: '10px' }}>{totalCount} cards</span>
+        </div>
+        <span style={{ color: '#fbbf24', fontSize: '16px', transform: expanded ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }}>▼</span>
+      </button>
+
+      {/* Expanded Content */}
+      {expanded && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {Object.entries(grouped).map(([folderId, folderData]) => {
+            const folderCardCount = Object.values(folderData.decks).reduce((sum, d) => sum + d.cards.length, 0);
+            const isFolderExpanded = expandedFolders[folderId];
+
+            return (
+              <div key={folderId} style={{ background: 'rgba(30,41,59,0.9)', borderRadius: '10px', border: '1px solid rgba(100,116,139,0.2)', overflow: 'hidden' }}>
+                {/* Folder Header */}
+                <button onClick={() => toggleFolder(folderId)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '18px' }}>{folderData.icon}</span>
+                    <span style={{ color: '#f1f5f9', fontWeight: 500, fontSize: '14px' }}>{folderData.name}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: '#fbbf24', fontSize: '12px' }}>{folderCardCount} ⭐</span>
+                    <span style={{ color: '#64748b', fontSize: '14px', transform: isFolderExpanded ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }}>▼</span>
+                  </div>
+                </button>
+
+                {/* Decks in folder */}
+                {isFolderExpanded && (
+                  <div style={{ borderTop: '1px solid rgba(100,116,139,0.15)', padding: '8px' }}>
+                    {Object.entries(folderData.decks).map(([deckId, deckData]) => (
+                      <div key={deckId} onClick={() => { setActiveDeck(deckData.deck); setView('study'); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', marginBottom: '4px', background: 'rgba(255,255,255,0.03)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '16px' }}>{deckData.deck.icon}</span>
+                          <span style={{ color: '#e2e8f0', fontSize: '13px' }}>{deckData.deck.name}</span>
+                        </div>
+                        <span style={{ color: '#fbbf24', fontSize: '11px', background: 'rgba(251,191,36,0.15)', padding: '2px 6px', borderRadius: '6px' }}>{deckData.cards.length} ⭐</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // HOME WITH FOLDERS
 function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakData, showPlanner, setShowPlanner, isMobile }) {
   const { signOut } = useAuth();
@@ -731,6 +854,9 @@ function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakDa
             </button>
           </div>
         )}
+
+        {/* Favorites Section */}
+        {path.length === 0 && <FavoritesSection setActiveDeck={setActiveDeck} setView={setView} />}
 
         {/* Folder/Deck Grid */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
