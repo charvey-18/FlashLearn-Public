@@ -1279,51 +1279,47 @@ function RevisionPlanner() {
     setDragStartDuration(session.duration);
   };
 
-  const handleDragMove = (e) => {
-    if (!dragSession || !timelineRef.current) return;
-    const clientY = e.clientY || e.touches?.[0]?.clientY;
-    const deltaY = clientY - dragStartY;
-    const deltaMins = Math.round(deltaY / 28) * 30; // Snap to 30-min intervals
-
-    const updated = sessions.map(s => {
-      if (s.id !== dragSession.id) return s;
-
-      if (dragType === 'move') {
-        let newStartMins = dragStartTime + deltaMins;
-        newStartMins = Math.max(6 * 60, Math.min(22 * 60 - s.duration, newStartMins)); // Clamp to 6am-10pm
-        return { ...s, startTime: minsToTime(newStartMins) };
-      } else if (dragType === 'resize-bottom') {
-        let newDuration = dragStartDuration + deltaMins;
-        newDuration = Math.max(30, Math.min(180, newDuration)); // 30min to 3h
-        return { ...s, duration: newDuration };
-      } else if (dragType === 'resize-top') {
-        let newStartMins = dragStartTime + deltaMins;
-        let newDuration = dragStartDuration - deltaMins;
-        if (newDuration < 30) { newDuration = 30; newStartMins = dragStartTime + dragStartDuration - 30; }
-        if (newDuration > 180) { newDuration = 180; newStartMins = dragStartTime + dragStartDuration - 180; }
-        newStartMins = Math.max(6 * 60, newStartMins);
-        return { ...s, startTime: minsToTime(newStartMins), duration: newDuration };
-      }
-      return s;
-    });
-    setSessions(updated);
-  };
-
-  const handleDragEnd = () => {
-    if (dragSession) {
-      saveRevisionSessions(sessions);
-    }
-    setDragSession(null);
-    setDragType(null);
-  };
-
   useEffect(() => {
     if (dragSession) {
-      const moveHandler = (e) => handleDragMove(e);
-      const endHandler = () => handleDragEnd();
+      const moveHandler = (e) => {
+        e.preventDefault();
+        if (!timelineRef.current) return;
+        const clientY = e.clientY || e.touches?.[0]?.clientY;
+        const deltaY = clientY - dragStartY;
+        const deltaMins = Math.round(deltaY / 28) * 30; // Snap to 30-min intervals
+
+        setSessions(prevSessions => prevSessions.map(s => {
+          if (s.id !== dragSession.id) return s;
+
+          if (dragType === 'move') {
+            let newStartMins = dragStartTime + deltaMins;
+            newStartMins = Math.max(6 * 60, Math.min(22 * 60 - s.duration, newStartMins));
+            return { ...s, startTime: minsToTime(newStartMins) };
+          } else if (dragType === 'resize-bottom') {
+            let newDuration = dragStartDuration + deltaMins;
+            newDuration = Math.max(30, Math.min(240, newDuration)); // 30min to 4h
+            return { ...s, duration: newDuration };
+          } else if (dragType === 'resize-top') {
+            let newStartMins = dragStartTime + deltaMins;
+            let newDuration = dragStartDuration - deltaMins;
+            if (newDuration < 30) { newDuration = 30; newStartMins = dragStartTime + dragStartDuration - 30; }
+            if (newDuration > 240) { newDuration = 240; newStartMins = dragStartTime + dragStartDuration - 240; }
+            newStartMins = Math.max(6 * 60, newStartMins);
+            return { ...s, startTime: minsToTime(newStartMins), duration: newDuration };
+          }
+          return s;
+        }));
+      };
+
+      const endHandler = () => {
+        saveRevisionSessions(sessions);
+        setDragSession(null);
+        setDragType(null);
+      };
+
       window.addEventListener('mousemove', moveHandler);
       window.addEventListener('mouseup', endHandler);
-      window.addEventListener('touchmove', moveHandler);
+      window.addEventListener('touchmove', moveHandler, { passive: false });
       window.addEventListener('touchend', endHandler);
       return () => {
         window.removeEventListener('mousemove', moveHandler);
@@ -1332,7 +1328,7 @@ function RevisionPlanner() {
         window.removeEventListener('touchend', endHandler);
       };
     }
-  }, [dragSession, dragStartY, dragStartTime, dragStartDuration, dragType]);
+  }, [dragSession, dragStartY, dragStartTime, dragStartDuration, dragType, sessions]);
 
   return (
     <div style={{ padding: '16px', color: '#e2e8f0', fontFamily: 'system-ui' }}>
@@ -1536,19 +1532,19 @@ function RevisionPlanner() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <div>
                 <label style={{ fontSize: '10px', color: '#64748b' }}>Work (mins)</label>
-                <input type="number" value={pomodoroSettings.workMins} onChange={e => { const v = { ...pomodoroSettings, workMins: parseInt(e.target.value) || 25 }; setPomodoroSettingsState(v); savePomodoroSettings(v); if (!pomodoroState.isRunning && pomodoroState.mode === 'work') setPomodoroState(p => ({ ...p, timeLeft: v.workMins * 60 })); }} style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '12px' }} />
+                <input type="text" inputMode="numeric" value={pomodoroSettings.workMins} onChange={e => { const val = e.target.value; const num = parseInt(val); const v = { ...pomodoroSettings, workMins: val === '' ? '' : (isNaN(num) ? pomodoroSettings.workMins : num) }; setPomodoroSettingsState(v); }} onBlur={e => { const num = parseInt(e.target.value) || 25; const v = { ...pomodoroSettings, workMins: Math.max(1, Math.min(120, num)) }; setPomodoroSettingsState(v); savePomodoroSettings(v); if (!pomodoroState.isRunning && pomodoroState.mode === 'work') setPomodoroState(p => ({ ...p, timeLeft: v.workMins * 60 })); }} style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '12px' }} />
               </div>
               <div>
                 <label style={{ fontSize: '10px', color: '#64748b' }}>Short break</label>
-                <input type="number" value={pomodoroSettings.shortBreak} onChange={e => { const v = { ...pomodoroSettings, shortBreak: parseInt(e.target.value) || 5 }; setPomodoroSettingsState(v); savePomodoroSettings(v); }} style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '12px' }} />
+                <input type="text" inputMode="numeric" value={pomodoroSettings.shortBreak} onChange={e => { const val = e.target.value; const num = parseInt(val); const v = { ...pomodoroSettings, shortBreak: val === '' ? '' : (isNaN(num) ? pomodoroSettings.shortBreak : num) }; setPomodoroSettingsState(v); }} onBlur={e => { const num = parseInt(e.target.value) || 5; const v = { ...pomodoroSettings, shortBreak: Math.max(1, Math.min(60, num)) }; setPomodoroSettingsState(v); savePomodoroSettings(v); if (!pomodoroState.isRunning && pomodoroState.mode === 'shortBreak') setPomodoroState(p => ({ ...p, timeLeft: v.shortBreak * 60 })); }} style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '12px' }} />
               </div>
               <div>
                 <label style={{ fontSize: '10px', color: '#64748b' }}>Long break</label>
-                <input type="number" value={pomodoroSettings.longBreak} onChange={e => { const v = { ...pomodoroSettings, longBreak: parseInt(e.target.value) || 15 }; setPomodoroSettingsState(v); savePomodoroSettings(v); }} style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '12px' }} />
+                <input type="text" inputMode="numeric" value={pomodoroSettings.longBreak} onChange={e => { const val = e.target.value; const num = parseInt(val); const v = { ...pomodoroSettings, longBreak: val === '' ? '' : (isNaN(num) ? pomodoroSettings.longBreak : num) }; setPomodoroSettingsState(v); }} onBlur={e => { const num = parseInt(e.target.value) || 15; const v = { ...pomodoroSettings, longBreak: Math.max(1, Math.min(60, num)) }; setPomodoroSettingsState(v); savePomodoroSettings(v); if (!pomodoroState.isRunning && pomodoroState.mode === 'longBreak') setPomodoroState(p => ({ ...p, timeLeft: v.longBreak * 60 })); }} style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '12px' }} />
               </div>
               <div>
                 <label style={{ fontSize: '10px', color: '#64748b' }}>Sessions</label>
-                <input type="number" value={pomodoroSettings.sessionsBeforeLong} onChange={e => { const v = { ...pomodoroSettings, sessionsBeforeLong: parseInt(e.target.value) || 4 }; setPomodoroSettingsState(v); savePomodoroSettings(v); }} style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '12px' }} />
+                <input type="text" inputMode="numeric" value={pomodoroSettings.sessionsBeforeLong} onChange={e => { const val = e.target.value; const num = parseInt(val); const v = { ...pomodoroSettings, sessionsBeforeLong: val === '' ? '' : (isNaN(num) ? pomodoroSettings.sessionsBeforeLong : num) }; setPomodoroSettingsState(v); }} onBlur={e => { const num = parseInt(e.target.value) || 4; const v = { ...pomodoroSettings, sessionsBeforeLong: Math.max(1, Math.min(10, num)) }; setPomodoroSettingsState(v); savePomodoroSettings(v); }} style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '12px' }} />
               </div>
             </div>
           </div>
