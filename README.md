@@ -1,37 +1,70 @@
-# FlashLearn
+# FlashLearn - AI-Powered Flashcards
 
-Hands-free, speech-enabled flashcard app for finance interview prep. Study while walking with headphone controls.
+Create and study flashcards on any topic with AI assistance. Features text-to-speech for hands-free learning.
 
-**[Live App](https://charvey-18.github.io/FlashLearn-Public/)**
-
-## Available Decks
-
-- **LBO Modeling** - Leveraged buyout fundamentals, deal structure, and returns analysis
-- **DCF Valuation** - Discounted cash flow analysis, WACC, and terminal value
-- **M&A Interview Prep** - Deal types, accretion/dilution, synergies, and process
-- **Accounting Fundamentals** - Financial statements, key ratios, and accounting principles
+🔗 **[Live Demo](https://charvey-18.github.io/FlashLearn-Public/)**
 
 ## Features
 
-- Multiple topic decks with per-deck progress tracking
-- Text-to-speech with selectable voices and adjustable speed
-- Headphone/media button controls (play, pause, next, previous)
-- Card flip, favorites, shuffle, and progress tracking
-- Source citations on every card for further reading
-- Progress saved locally in the browser
-- Dark theme, mobile-responsive
+- ✨ **AI-Powered Generation** - Create flashcards on any topic using GPT-4
+- 🎧 **Hands-Free Learning** - Text-to-speech reads cards aloud with headphone controls
+- ☁️ **Cloud Sync** - Sign in to save your decks across devices (Supabase)
+- ✏️ **Full Editing** - Edit any card's question, answer, or source
+- ⭐ **Favorites & Progress** - Track mastery and bookmark cards for review
+- 🔀 **Shuffle Mode** - Randomize card order for better retention
+- 🌙 **Dark Theme** - Easy on the eyes
 
-## Request a Topic
+## Pre-loaded Decks
 
-Want a new deck added? [Submit a topic request](https://github.com/charvey-18/FlashLearn-Public/issues/new?title=Topic%20Request%3A%20&body=%23%23%20Topic%20Request%0A%0A**Topic%20name%3A**%0A%0A%0A**Specific%20areas%20to%20cover%3A**%0A%0A%0A**Any%20additional%20context%3A**%0A%0A&labels=topic-request) and we'll build it.
+Start learning immediately with these interview prep decks:
+
+| Deck | Cards | Description |
+|------|-------|-------------|
+| 🏦 LBO Modeling | 14 | Leveraged buyout fundamentals, deal structure, returns |
+| 💰 DCF Valuation | 12 | Discounted cash flow, WACC, terminal value |
+| 📒 Accounting | 12 | Financial statements, ratios, key concepts |
+
+## How to Use
+
+### Study Pre-loaded Decks
+1. Open the app
+2. Click any deck to start studying
+3. Tap cards to flip between question and answer
+4. Use play button for auto-read mode with TTS
+5. Mark cards as "Mastered" or "Still Learning"
+
+### Create Custom Decks with AI
+1. Click "Sign In" and create an account
+2. Click "Set up OpenAI API Key" and enter your key
+3. Click "Create Deck with AI"
+4. Enter any topic (e.g., "Python data structures", "World War 2")
+5. Review and edit generated cards
+6. Save your deck
+
+### Get an OpenAI API Key
+1. Go to [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+2. Create an account or sign in
+3. Generate a new API key
+4. Copy and paste it into FlashLearn
+
+> Your API key is stored locally in your browser and never sent to our servers.
 
 ## Tech Stack
 
-- React 18 (loaded via CDN)
-- Web Speech Synthesis API
-- Media Session API
-- LocalStorage for persistence
+- **Frontend**: React 18 (CDN, single-file)
+- **AI**: OpenAI GPT-4o-mini
+- **Backend**: Supabase (Auth + PostgreSQL)
+- **TTS**: Web Speech Synthesis API
+- **Hosting**: GitHub Pages
 
-## Usage
+## Development
 
-Open `index.html` in a browser, or visit the live site above. No build step required.
+This is a single-file React app with no build step required. Simply:
+
+1. Clone the repo
+2. Open `index.html` in a browser
+3. For Supabase features, set up your own project at [supabase.com](https://supabase.com)
+
+## License
+
+MIT

@@ -3,29 +3,82 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FlashLearn</title>
+  <title>FlashLearn - AI-Powered Flashcards</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0f172a; }
+    body { background: #0f172a; font-family: system-ui, -apple-system, sans-serif; }
+    input, textarea, select, button { font-family: inherit; }
   </style>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
   <div id="root"></div>
-  <script type="text/babel" data-type="module">
-const { useState, useEffect, useRef } = React;
+  <script type="text/babel">
+const { useState, useEffect, useRef, createContext, useContext } = React;
 
 // ============================================================
-// DECK DATA
+// SUPABASE CONFIG
 // ============================================================
+const SUPABASE_URL = 'https://bqtqmbyxdvinjbheykcc.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_wH-eykJr8kFDMinN29bQyg_rrhqoqlP';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const DECKS = [
+// ============================================================
+// AUTH CONTEXT
+// ============================================================
+const AuthContext = createContext(null);
+
+function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const signUp = async (email, password) => {
+    const { error } = await supabase.auth.signUp({ email, password });
+    return { error };
+  };
+
+  const signIn = async (email, password) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return { error };
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, signUp, signIn, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+const useAuth = () => useContext(AuthContext);
+
+// ============================================================
+// PRESET DECKS (for users without account or as templates)
+// ============================================================
+const PRESET_DECKS = [
   {
     id: 'lbo',
     name: 'LBO Modeling',
-    icon: '\u{1F3E6}',
+    icon: '🏦',
     description: 'Leveraged Buyout fundamentals: deal structure, returns analysis, and modeling mechanics',
     cards: [
       { category: "LBO Basics", front: "What is a leveraged buyout?", back: "An acquisition of a company using a significant amount of borrowed money, typically 60 to 70 percent debt, to meet the cost of acquisition. The assets of the acquired company often serve as collateral. The goal is to generate returns through debt paydown, EBITDA growth, and multiple expansion.", source: "Wall Street Prep" },
@@ -47,7 +100,7 @@ const DECKS = [
   {
     id: 'dcf',
     name: 'DCF Valuation',
-    icon: '\u{1F4B0}',
+    icon: '💰',
     description: 'Discounted Cash Flow analysis: WACC, terminal value, and valuation mechanics',
     cards: [
       { category: "DCF Basics", front: "What is a DCF and when would you use it?", back: "A Discounted Cash Flow analysis values a company by projecting its future free cash flows and discounting them back to present value using an appropriate discount rate. Best used for companies with predictable cash flows. Less appropriate for early-stage companies, banks, or highly cyclical businesses.", source: "Damodaran" },
@@ -65,29 +118,9 @@ const DECKS = [
     ]
   },
   {
-    id: 'mna',
-    name: 'M&A Interview Prep',
-    icon: '\u{1F91D}',
-    description: 'Mergers & Acquisitions: deal types, accretion/dilution, synergies, and process',
-    cards: [
-      { category: "M&A Basics", front: "What are the main types of M&A transactions?", back: "Mergers combine two companies into one. Acquisitions involve one company purchasing another. Asset purchases buy specific assets rather than the entire entity. Stock purchases buy ownership shares. Joint ventures create a new entity owned by both parties. Each has different tax, legal, and accounting implications.", source: "DePamphilis M&A" },
-      { category: "M&A Basics", front: "Why do companies pursue acquisitions?", back: "Revenue synergies from cross-selling or new markets. Cost synergies from eliminating redundancies. Acquiring technology or intellectual property. Gaining market share or eliminating competition. Achieving economies of scale. Tax benefits. Diversification. Access to new geographies or distribution channels.", source: "McKinsey" },
-      { category: "M&A Basics", front: "What is the difference between a stock deal and an asset deal?", back: "In a stock deal, the buyer acquires all shares and inherits all assets and liabilities. The seller pays capital gains tax. In an asset deal, the buyer selects specific assets and liabilities. The buyer gets a tax step-up on assets. The seller may face double taxation for C-corps. Asset deals are cleaner but more complex.", source: "Wall Street Prep" },
-      { category: "Accretion/Dilution", front: "What is accretion dilution analysis?", back: "It measures whether an acquisition increases or decreases the acquirer's earnings per share. If pro forma EPS is higher than standalone EPS, the deal is accretive. If lower, it is dilutive. Key inputs are purchase price, financing mix, target earnings, synergies, and new share issuance.", source: "Rosenbaum & Pearl" },
-      { category: "Accretion/Dilution", front: "When is a deal typically accretive?", back: "When the target's P/E ratio is lower than the acquirer's, in an all-stock deal. When cost synergies are significant. When the deal is financed with low-cost debt rather than equity. When the target has strong earnings relative to the premium paid. Accretion alone does not mean value creation.", source: "Wall Street Prep" },
-      { category: "Synergies", front: "What are the different types of synergies?", back: "Cost synergies include headcount reduction, facility consolidation, procurement savings, and technology rationalization. Revenue synergies include cross-selling, geographic expansion, and pricing power. Financial synergies include lower cost of capital and tax benefits. Cost synergies are more reliable and typically realized within 1 to 3 years.", source: "McKinsey" },
-      { category: "Synergies", front: "How do you value synergies?", back: "Estimate the annual run-rate synergy amount. Determine the timeline to achieve full synergies, typically 2 to 3 years. Subtract one-time costs to achieve them such as severance or integration costs. Discount or capitalize the net synergies. Buyers typically pay 25 to 50 percent of synergy value to the seller as part of the premium.", source: "Deloitte" },
-      { category: "Valuation", front: "How do you value a target in M&A?", back: "Use multiple methodologies. Comparable company analysis using trading multiples. Precedent transaction analysis using deal multiples. DCF analysis for intrinsic value. LBO analysis to determine PE bid price. Sum of the parts for diversified companies. The range from all methods informs the offer price.", source: "Rosenbaum & Pearl" },
-      { category: "Valuation", front: "What is a control premium?", back: "The amount paid above the current trading price to acquire a controlling interest. Typically 20 to 40 percent above the unaffected share price. Reflects the value of control, synergies, and strategic benefits. Higher premiums for contested deals, strategic assets, or significant synergy potential.", source: "FactSet MergerMetrics" },
-      { category: "Process", front: "Walk through the sell-side M&A process.", back: "Phase 1, preparation: engage advisors, prepare CIM and financial model. Phase 2, marketing: contact potential buyers, sign NDAs, distribute materials. Phase 3, first round: receive preliminary indications of interest. Phase 4, due diligence: grant data room access to shortlisted buyers. Phase 5, final bids: receive definitive offers. Phase 6, negotiation and signing. Phase 7, closing after regulatory approval.", source: "Rosenbaum & Pearl" },
-      { category: "Process", front: "What is a fairness opinion?", back: "A letter from an investment bank stating that a proposed transaction price is fair from a financial point of view to the shareholders. Required by the board's fiduciary duty. Based on DCF, comps, precedent transactions, and premiums analysis. Protects directors from shareholder lawsuits challenging the deal price.", source: "Rosenbaum & Pearl" },
-      { category: "Defense", front: "What are common M&A defense mechanisms?", back: "Poison pill or shareholder rights plan dilutes hostile bidder. Staggered board prevents full board replacement in one election. White knight finds a friendlier buyer. Crown jewel defense sells key assets. Pac-Man defense makes counter-bid for the acquirer. Golden parachutes increase acquisition cost.", source: "DePamphilis M&A" },
-    ]
-  },
-  {
     id: 'accounting',
     name: 'Accounting Fundamentals',
-    icon: '\u{1F4D2}',
+    icon: '📒',
     description: 'Financial statements, key ratios, and accounting principles for interviews',
     cards: [
       { category: "Financial Statements", front: "What are the three main financial statements and how are they linked?", back: "Income statement shows profitability over a period. Balance sheet shows assets, liabilities, and equity at a point in time. Cash flow statement shows cash movements. Net income from the income statement flows to retained earnings on the balance sheet and is the starting point for cash flow from operations.", source: "Accounting Standards Codification" },
@@ -109,85 +142,644 @@ const DECKS = [
 // ============================================================
 // HELPERS
 // ============================================================
-
-const saveData = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} };
-const loadData = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch(e) { return d; } };
-
-const getDeckProgress = (deck) => {
-  const progress = loadData(`progress_${deck.id}`, {});
-  const known = Object.values(progress).filter(v => v === 'known').length;
-  return { known, total: deck.cards.length, percent: deck.cards.length > 0 ? Math.round((known / deck.cards.length) * 100) : 0 };
-};
-
-const TOPIC_REQUEST_URL = "https://github.com/charvey-18/FlashLearn-Public/issues/new?" +
-  "title=" + encodeURIComponent("Topic Request: ") +
-  "&body=" + encodeURIComponent(
-    "## Topic Request\n\n**Topic name:**\n\n\n**Specific areas to cover:**\n\n\n**Any additional context:**\n\n"
-  ) +
-  "&labels=topic-request";
+const saveLocal = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} };
+const loadLocal = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch(e) { return d; } };
 
 // ============================================================
-// APP
+// MAIN APP
 // ============================================================
-
 function App() {
+  const { user, loading } = useAuth();
   const [view, setView] = useState('home');
   const [activeDeck, setActiveDeck] = useState(null);
+  const [decks, setDecks] = useState([]);
+  const [openaiKey, setOpenaiKey] = useState(() => loadLocal('openai_api_key', ''));
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
-  if (view === 'home') return <Home decks={DECKS} setActiveDeck={setActiveDeck} setView={setView} />;
-  if (view === 'study') return <Study deck={activeDeck} setView={setView} />;
+  // Load decks when user changes
+  useEffect(() => {
+    if (user) {
+      loadUserDecks();
+    } else {
+      // Use preset decks for non-logged-in users
+      setDecks(PRESET_DECKS.map(d => ({ ...d, isPreset: true })));
+    }
+  }, [user]);
+
+  const loadUserDecks = async () => {
+    // Load user's custom decks
+    const { data: userDecks } = await supabase
+      .from('decks')
+      .select('*, cards(*)')
+      .eq('user_id', user.id);
+
+    // Combine with presets
+    const allDecks = [
+      ...PRESET_DECKS.map(d => ({ ...d, isPreset: true })),
+      ...(userDecks || []).map(d => ({
+        id: d.id,
+        name: d.name,
+        icon: d.icon,
+        description: d.description,
+        cards: d.cards || [],
+        isPreset: false
+      }))
+    ];
+    setDecks(allDecks);
+  };
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: '#60a5fa', fontSize: '18px' }}>Loading...</div>
+      </div>
+    );
+  }
+
+  if (view === 'auth') return <AuthScreen setView={setView} />;
+  if (view === 'home') return (
+    <Home
+      decks={decks}
+      setActiveDeck={setActiveDeck}
+      setView={setView}
+      user={user}
+      openaiKey={openaiKey}
+      setShowApiKeyModal={setShowApiKeyModal}
+      reloadDecks={loadUserDecks}
+    />
+  );
+  if (view === 'study') return <Study deck={activeDeck} setView={setView} user={user} />;
+  if (view === 'create') return (
+    <CreateDeck
+      setView={setView}
+      openaiKey={openaiKey}
+      setShowApiKeyModal={setShowApiKeyModal}
+      user={user}
+      reloadDecks={loadUserDecks}
+    />
+  );
+
   return null;
+}
+
+// ============================================================
+// AUTH SCREEN
+// ============================================================
+function AuthScreen({ setView }) {
+  const { signIn, signUp } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    const { error } = isSignUp
+      ? await signUp(email, password)
+      : await signIn(email, password);
+
+    setLoading(false);
+
+    if (error) {
+      setError(error.message);
+    } else if (isSignUp) {
+      setSuccess('Check your email to confirm your account!');
+    } else {
+      setView('home');
+    }
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #0f172a, #1e293b)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div style={{ background: 'rgba(30,41,59,0.9)', borderRadius: '20px', padding: '40px', maxWidth: '400px', width: '100%', border: '1px solid rgba(100,116,139,0.2)' }}>
+        <h1 style={{ color: '#60a5fa', fontSize: '28px', textAlign: 'center', marginBottom: '8px' }}>FlashLearn</h1>
+        <p style={{ color: '#94a3b8', textAlign: 'center', marginBottom: '32px' }}>
+          {isSignUp ? 'Create your account' : 'Welcome back'}
+        </p>
+
+        <form onSubmit={handleSubmit}>
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            style={{ width: '100%', padding: '14px 16px', borderRadius: '10px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '16px', marginBottom: '12px', outline: 'none' }}
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            style={{ width: '100%', padding: '14px 16px', borderRadius: '10px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '16px', marginBottom: '16px', outline: 'none' }}
+            required
+            minLength={6}
+          />
+
+          {error && <p style={{ color: '#ef4444', fontSize: '14px', marginBottom: '16px', textAlign: 'center' }}>{error}</p>}
+          {success && <p style={{ color: '#10b981', fontSize: '14px', marginBottom: '16px', textAlign: 'center' }}>{success}</p>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{ width: '100%', padding: '14px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'white', fontSize: '16px', fontWeight: 600, cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.7 : 1 }}
+          >
+            {loading ? 'Please wait...' : (isSignUp ? 'Sign Up' : 'Sign In')}
+          </button>
+        </form>
+
+        <p style={{ color: '#94a3b8', textAlign: 'center', marginTop: '24px', fontSize: '14px' }}>
+          {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+          <button
+            onClick={() => { setIsSignUp(!isSignUp); setError(''); setSuccess(''); }}
+            style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', fontSize: '14px', textDecoration: 'underline' }}
+          >
+            {isSignUp ? 'Sign In' : 'Sign Up'}
+          </button>
+        </p>
+
+        <button
+          onClick={() => setView('home')}
+          style={{ width: '100%', marginTop: '16px', padding: '12px', borderRadius: '10px', border: '1px solid rgba(100,116,139,0.3)', background: 'transparent', color: '#64748b', fontSize: '14px', cursor: 'pointer' }}
+        >
+          Continue without account
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// API KEY MODAL
+// ============================================================
+function ApiKeyModal({ openaiKey, setOpenaiKey, onClose }) {
+  const [key, setKey] = useState(openaiKey);
+
+  const handleSave = () => {
+    setOpenaiKey(key);
+    saveLocal('openai_api_key', key);
+    onClose();
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 }}>
+      <div style={{ background: '#1e293b', borderRadius: '20px', padding: '32px', maxWidth: '450px', width: '100%', border: '1px solid rgba(100,116,139,0.3)' }}>
+        <h2 style={{ color: '#f1f5f9', fontSize: '20px', marginBottom: '8px' }}>🔑 OpenAI API Key</h2>
+        <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '20px', lineHeight: 1.5 }}>
+          Enter your OpenAI API key to generate flashcards with AI. Your key is stored locally in your browser and never sent to our servers.
+        </p>
+        <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '16px' }}>
+          Get your key at: <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa' }}>platform.openai.com/api-keys</a>
+        </p>
+        <input
+          type="password"
+          placeholder="sk-..."
+          value={key}
+          onChange={e => setKey(e.target.value)}
+          style={{ width: '100%', padding: '14px 16px', borderRadius: '10px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '14px', marginBottom: '20px', outline: 'none', fontFamily: 'monospace' }}
+        />
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1px solid rgba(100,116,139,0.3)', background: 'transparent', color: '#94a3b8', fontSize: '14px', cursor: 'pointer' }}>
+            Cancel
+          </button>
+          <button onClick={handleSave} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: '#3b82f6', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
+            Save Key
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ============================================================
 // HOME
 // ============================================================
+function Home({ decks, setActiveDeck, setView, user, openaiKey, setShowApiKeyModal, reloadDecks }) {
+  const { signOut } = useAuth();
+  const [showApiModal, setShowApiModal] = useState(false);
+  const [deletingDeck, setDeletingDeck] = useState(null);
 
-function Home({ decks, setActiveDeck, setView }) {
+  const getDeckProgress = (deck) => {
+    const progressKey = `progress_${deck.id}`;
+    const progress = loadLocal(progressKey, {});
+    const known = Object.values(progress).filter(v => v === 'known').length;
+    return { known, total: deck.cards.length, percent: deck.cards.length > 0 ? Math.round((known / deck.cards.length) * 100) : 0 };
+  };
+
+  const handleDeleteDeck = async (deck) => {
+    if (deck.isPreset) return;
+
+    const { error } = await supabase.from('decks').delete().eq('id', deck.id);
+    if (!error) {
+      reloadDecks();
+      setDeletingDeck(null);
+    }
+  };
+
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #0f172a, #1e293b)', padding: '40px 20px', fontFamily: 'system-ui' }}>
-      <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-        <h1 style={{ textAlign: 'center', fontSize: '32px', fontWeight: 700, color: '#60a5fa', marginBottom: '8px' }}>FlashLearn</h1>
-        <p style={{ textAlign: 'center', color: '#94a3b8', marginBottom: '32px' }}>Hands-free flashcard learning</p>
+      {showApiModal && (
+        <ApiKeyModal
+          openaiKey={openaiKey}
+          setOpenaiKey={(key) => { saveLocal('openai_api_key', key); window.location.reload(); }}
+          onClose={() => setShowApiModal(false)}
+        />
+      )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {deletingDeck && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 }}>
+          <div style={{ background: '#1e293b', borderRadius: '20px', padding: '32px', maxWidth: '400px', width: '100%', textAlign: 'center' }}>
+            <h3 style={{ color: '#f1f5f9', marginBottom: '12px' }}>Delete "{deletingDeck.name}"?</h3>
+            <p style={{ color: '#94a3b8', marginBottom: '24px' }}>This will permanently delete this deck and all its cards.</p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={() => setDeletingDeck(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1px solid rgba(100,116,139,0.3)', background: 'transparent', color: '#94a3b8', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => handleDeleteDeck(deletingDeck)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: '#ef4444', color: 'white', fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ maxWidth: '500px', margin: '0 auto' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <div>
+            <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#60a5fa', marginBottom: '4px' }}>FlashLearn</h1>
+            <p style={{ color: '#64748b', fontSize: '14px' }}>
+              {user ? `Welcome, ${user.email.split('@')[0]}` : 'AI-powered flashcards'}
+            </p>
+          </div>
+          {user ? (
+            <button onClick={signOut} style={{ padding: '10px 16px', borderRadius: '10px', border: '1px solid rgba(100,116,139,0.3)', background: 'transparent', color: '#94a3b8', fontSize: '13px', cursor: 'pointer' }}>
+              Sign Out
+            </button>
+          ) : (
+            <button onClick={() => setView('auth')} style={{ padding: '10px 16px', borderRadius: '10px', border: 'none', background: '#3b82f6', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              Sign In
+            </button>
+          )}
+        </div>
+
+        {/* Create with AI button */}
+        <button
+          onClick={() => {
+            if (!openaiKey) {
+              setShowApiModal(true);
+            } else if (!user) {
+              setView('auth');
+            } else {
+              setView('create');
+            }
+          }}
+          style={{
+            width: '100%', padding: '20px', borderRadius: '16px', border: '2px dashed rgba(96,165,250,0.5)',
+            background: 'rgba(59,130,246,0.1)', color: '#60a5fa', fontSize: '16px', fontWeight: 600,
+            cursor: 'pointer', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
+          }}
+        >
+          <span style={{ fontSize: '24px' }}>✨</span>
+          Create Deck with AI
+        </button>
+
+        {/* API Key status */}
+        <button
+          onClick={() => setShowApiModal(true)}
+          style={{
+            width: '100%', padding: '12px', borderRadius: '10px', border: 'none',
+            background: openaiKey ? 'rgba(16,185,129,0.1)' : 'rgba(251,191,36,0.1)',
+            color: openaiKey ? '#10b981' : '#fbbf24', fontSize: '13px', cursor: 'pointer', marginBottom: '24px'
+          }}
+        >
+          {openaiKey ? '✓ OpenAI API Key configured' : '⚠ Set up OpenAI API Key to create decks'}
+        </button>
+
+        {/* Deck list */}
+        <h2 style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>
+          Your Decks
+        </h2>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {decks.map(deck => {
             const prog = getDeckProgress(deck);
             return (
-              <div key={deck.id} onClick={() => { setActiveDeck(deck); setView('study'); }}
-                style={{ background: 'rgba(30,41,59,0.9)', borderRadius: '16px', padding: '20px', cursor: 'pointer', border: '1px solid rgba(100,116,139,0.2)', transition: 'border-color 0.2s' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <span style={{ fontSize: '36px' }}>{deck.icon}</span>
-                  <div style={{ flex: 1 }}>
-                    <h2 style={{ color: '#f1f5f9', fontSize: '18px', margin: 0 }}>{deck.name}</h2>
-                    <p style={{ color: '#64748b', margin: '4px 0 0', fontSize: '13px' }}>{deck.description}</p>
+              <div
+                key={deck.id}
+                style={{ background: 'rgba(30,41,59,0.9)', borderRadius: '16px', padding: '20px', border: '1px solid rgba(100,116,139,0.2)', position: 'relative' }}
+              >
+                <div
+                  onClick={() => { setActiveDeck(deck); setView('study'); }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <span style={{ fontSize: '36px' }}>{deck.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h3 style={{ color: '#f1f5f9', fontSize: '18px', margin: 0 }}>{deck.name}</h3>
+                        {deck.isPreset && <span style={{ background: 'rgba(100,116,139,0.3)', color: '#94a3b8', fontSize: '10px', padding: '2px 8px', borderRadius: '10px' }}>PRESET</span>}
+                      </div>
+                      <p style={{ color: '#64748b', margin: '4px 0 0', fontSize: '13px' }}>{deck.description}</p>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{ width: `${prog.percent}%`, height: '100%', background: prog.percent === 100 ? '#10b981' : '#3b82f6', borderRadius: '3px', transition: 'width 0.3s' }}></div>
+                    </div>
+                    <span style={{ color: '#64748b', fontSize: '12px', whiteSpace: 'nowrap' }}>{prog.known}/{prog.total} mastered</span>
                   </div>
                 </div>
-                <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
-                    <div style={{ width: `${prog.percent}%`, height: '100%', background: prog.percent === 100 ? '#10b981' : '#3b82f6', borderRadius: '3px', transition: 'width 0.3s' }}></div>
-                  </div>
-                  <span style={{ color: '#64748b', fontSize: '12px', whiteSpace: 'nowrap' }}>{prog.known}/{prog.total} mastered</span>
-                </div>
+
+                {/* Delete button for custom decks */}
+                {!deck.isPreset && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setDeletingDeck(deck); }}
+                    style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '18px', padding: '4px' }}
+                  >
+                    🗑
+                  </button>
+                )}
               </div>
             );
           })}
         </div>
 
-        {/* Request a Topic */}
-        <a href={TOPIC_REQUEST_URL} target="_blank" rel="noopener noreferrer"
-          style={{
-            display: 'block', textAlign: 'center', marginTop: '24px', padding: '14px 24px',
-            borderRadius: '12px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(30,41,59,0.5)',
-            color: '#94a3b8', fontSize: '14px', textDecoration: 'none', cursor: 'pointer', fontFamily: 'system-ui'
-          }}>
-          {'\u{1F4AC}'} Request a Topic
-        </a>
-
-        {/* Footer tip */}
-        <p style={{ textAlign: 'center', color: '#4b5563', fontSize: '12px', marginTop: '24px' }}>
-          {'\u{1F3A7}'} All decks support headphone controls for hands-free learning
+        {/* Footer */}
+        <p style={{ textAlign: 'center', color: '#4b5563', fontSize: '12px', marginTop: '32px' }}>
+          🎧 All decks support headphone controls for hands-free learning
         </p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// CREATE DECK WITH AI
+// ============================================================
+function CreateDeck({ setView, openaiKey, setShowApiKeyModal, user, reloadDecks }) {
+  const [topic, setTopic] = useState('');
+  const [numCards, setNumCards] = useState(10);
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [generatedCards, setGeneratedCards] = useState([]);
+  const [deckName, setDeckName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const generateCards = async () => {
+    if (!topic.trim()) return;
+
+    setLoading(true);
+    setMessages(prev => [...prev, { role: 'user', content: `Create ${numCards} flashcards about: ${topic}` }]);
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openaiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: `You are a flashcard generator. Create educational flashcards for studying.
+              Return ONLY a valid JSON array with no markdown formatting, no code blocks, just raw JSON.
+              Each card should have: category, front (question), back (detailed answer), source (credible reference).
+              Make questions clear and answers comprehensive but concise.`
+            },
+            {
+              role: 'user',
+              content: `Create exactly ${numCards} flashcards about: ${topic}
+
+              Return as JSON array: [{"category": "Topic Area", "front": "Question?", "back": "Detailed answer", "source": "Reference"}]`
+            }
+          ],
+          temperature: 0.7
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error.message);
+      }
+
+      let content = data.choices[0].message.content;
+
+      // Clean up the response - remove markdown code blocks if present
+      content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+      const cards = JSON.parse(content);
+
+      setGeneratedCards(cards);
+      setDeckName(topic);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `I've generated ${cards.length} flashcards about "${topic}". Review them below and save when ready!`
+      }]);
+
+    } catch (err) {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `Error: ${err.message}. Please check your API key and try again.`
+      }]);
+    }
+
+    setLoading(false);
+  };
+
+  const saveDeck = async () => {
+    if (!deckName.trim() || generatedCards.length === 0) return;
+
+    setSaving(true);
+
+    try {
+      // Create deck
+      const { data: deck, error: deckError } = await supabase
+        .from('decks')
+        .insert({
+          user_id: user.id,
+          name: deckName,
+          icon: '📚',
+          description: `AI-generated deck about ${topic}`
+        })
+        .select()
+        .single();
+
+      if (deckError) throw deckError;
+
+      // Create cards
+      const cardsToInsert = generatedCards.map(card => ({
+        deck_id: deck.id,
+        category: card.category,
+        front: card.front,
+        back: card.back,
+        source: card.source
+      }));
+
+      const { error: cardsError } = await supabase
+        .from('cards')
+        .insert(cardsToInsert);
+
+      if (cardsError) throw cardsError;
+
+      await reloadDecks();
+      setView('home');
+
+    } catch (err) {
+      alert('Error saving deck: ' + err.message);
+    }
+
+    setSaving(false);
+  };
+
+  const updateCard = (index, field, value) => {
+    setGeneratedCards(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const deleteCard = (index) => {
+    setGeneratedCards(prev => prev.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #0f172a, #1e293b)', padding: '20px', fontFamily: 'system-ui' }}>
+      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+          <button onClick={() => setView('home')} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '10px', padding: '10px 16px', color: '#94a3b8', fontSize: '14px', cursor: 'pointer' }}>
+            ← Back
+          </button>
+          <h1 style={{ color: '#f1f5f9', fontSize: '20px', margin: 0 }}>✨ Create with AI</h1>
+        </div>
+
+        {/* Chat messages */}
+        <div style={{ background: 'rgba(30,41,59,0.8)', borderRadius: '16px', padding: '20px', marginBottom: '20px', minHeight: '150px', maxHeight: '300px', overflowY: 'auto' }}>
+          {messages.length === 0 ? (
+            <p style={{ color: '#64748b', textAlign: 'center', marginTop: '40px' }}>
+              Tell me what topic you want to study, and I'll create flashcards for you!
+            </p>
+          ) : (
+            messages.map((msg, i) => (
+              <div key={i} style={{ marginBottom: '16px', textAlign: msg.role === 'user' ? 'right' : 'left' }}>
+                <div style={{
+                  display: 'inline-block', padding: '12px 16px', borderRadius: '12px', maxWidth: '85%',
+                  background: msg.role === 'user' ? '#3b82f6' : 'rgba(255,255,255,0.1)',
+                  color: '#f1f5f9', fontSize: '14px', lineHeight: 1.5
+                }}>
+                  {msg.content}
+                </div>
+              </div>
+            ))
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input area */}
+        {generatedCards.length === 0 && (
+          <div style={{ background: 'rgba(30,41,59,0.8)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+            <input
+              type="text"
+              placeholder="Enter a topic (e.g., Python data structures, World War 2, Organic Chemistry)"
+              value={topic}
+              onChange={e => setTopic(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && !loading && generateCards()}
+              style={{ width: '100%', padding: '14px 16px', borderRadius: '10px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '15px', marginBottom: '12px', outline: 'none' }}
+            />
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <select
+                value={numCards}
+                onChange={e => setNumCards(parseInt(e.target.value))}
+                style={{ padding: '12px 16px', borderRadius: '10px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '14px', outline: 'none' }}
+              >
+                <option value={5}>5 cards</option>
+                <option value={10}>10 cards</option>
+                <option value={15}>15 cards</option>
+                <option value={20}>20 cards</option>
+              </select>
+              <button
+                onClick={generateCards}
+                disabled={loading || !topic.trim()}
+                style={{ flex: 1, padding: '14px', borderRadius: '10px', border: 'none', background: loading ? '#64748b' : '#3b82f6', color: 'white', fontSize: '15px', fontWeight: 600, cursor: loading ? 'wait' : 'pointer' }}
+              >
+                {loading ? 'Generating...' : 'Generate Cards'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Generated cards preview */}
+        {generatedCards.length > 0 && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <input
+                type="text"
+                value={deckName}
+                onChange={e => setDeckName(e.target.value)}
+                placeholder="Deck name"
+                style={{ flex: 1, padding: '12px 16px', borderRadius: '10px', border: '1px solid rgba(100,116,139,0.3)', background: 'rgba(0,0,0,0.3)', color: '#f1f5f9', fontSize: '15px', outline: 'none' }}
+              />
+              <button
+                onClick={saveDeck}
+                disabled={saving}
+                style={{ padding: '12px 24px', borderRadius: '10px', border: 'none', background: '#10b981', color: 'white', fontSize: '15px', fontWeight: 600, cursor: saving ? 'wait' : 'pointer' }}
+              >
+                {saving ? 'Saving...' : 'Save Deck'}
+              </button>
+            </div>
+
+            <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '16px' }}>
+              {generatedCards.length} cards • Click any card to edit
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '400px', overflowY: 'auto', paddingRight: '8px' }}>
+              {generatedCards.map((card, i) => (
+                <div key={i} style={{ background: 'rgba(30,41,59,0.9)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(100,116,139,0.2)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
+                    <span style={{ color: '#60a5fa', fontSize: '11px', fontWeight: 600 }}>{card.category}</span>
+                    <button onClick={() => deleteCard(i)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px' }}>✕</button>
+                  </div>
+                  <textarea
+                    value={card.front}
+                    onChange={e => updateCard(i, 'front', e.target.value)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid rgba(100,116,139,0.2)', background: 'rgba(0,0,0,0.2)', color: '#f1f5f9', fontSize: '14px', marginBottom: '8px', resize: 'vertical', minHeight: '50px', outline: 'none' }}
+                  />
+                  <textarea
+                    value={card.back}
+                    onChange={e => updateCard(i, 'back', e.target.value)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid rgba(100,116,139,0.2)', background: 'rgba(0,0,0,0.2)', color: '#94a3b8', fontSize: '13px', resize: 'vertical', minHeight: '80px', outline: 'none' }}
+                  />
+                  <input
+                    type="text"
+                    value={card.source}
+                    onChange={e => updateCard(i, 'source', e.target.value)}
+                    placeholder="Source"
+                    style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(100,116,139,0.2)', background: 'rgba(0,0,0,0.2)', color: '#64748b', fontSize: '12px', marginTop: '8px', outline: 'none' }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => { setGeneratedCards([]); setMessages([]); setTopic(''); }}
+              style={{ width: '100%', marginTop: '16px', padding: '12px', borderRadius: '10px', border: '1px solid rgba(100,116,139,0.3)', background: 'transparent', color: '#94a3b8', fontSize: '14px', cursor: 'pointer' }}
+            >
+              Start Over
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -196,13 +788,12 @@ function Home({ decks, setActiveDeck, setView }) {
 // ============================================================
 // STUDY
 // ============================================================
-
-function Study({ deck, setView }) {
+function Study({ deck, setView, user }) {
   const [cardIndex, setCardIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(() => loadData(`progress_${deck.id}`, {}));
-  const [favorites, setFavorites] = useState(() => loadData(`favorites_${deck.id}`, {}));
+  const [progress, setProgress] = useState(() => loadLocal(`progress_${deck.id}`, {}));
+  const [favorites, setFavorites] = useState(() => loadLocal(`favorites_${deck.id}`, {}));
   const [shuffled, setShuffled] = useState(false);
   const [filter, setFilter] = useState('all');
   const [order, setOrder] = useState(() => deck.cards.map((_, i) => i));
@@ -210,9 +801,11 @@ function Study({ deck, setView }) {
   const [voices, setVoices] = useState([]);
   const [speed, setSpeed] = useState(0.9);
   const [phase, setPhase] = useState('idle');
+  const [editingCard, setEditingCard] = useState(null);
 
   const timerRef = useRef(null);
   const utteranceRef = useRef(null);
+  const isPlayingRef = useRef(false);
 
   const card = deck.cards[order[cardIndex]];
   const knownCount = Object.values(progress).filter(v => v === 'known').length;
@@ -220,18 +813,11 @@ function Study({ deck, setView }) {
   useEffect(() => {
     const loadVoices = () => {
       const allVoices = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
-      const premiumOrder = [
-        'Samantha', 'Karen', 'Daniel', 'Moira', 'Tessa', 'Fiona',
-        'Google UK English Female', 'Google UK English Male', 'Google US English',
-        'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Guy',
-        'Enhanced', 'Premium', 'Natural'
-      ];
+      const premiumOrder = ['Samantha', 'Karen', 'Daniel', 'Moira', 'Google UK English Female', 'Google US English'];
       const sorted = [...allVoices].sort((a, b) => {
         const aIdx = premiumOrder.findIndex(p => a.name.includes(p));
         const bIdx = premiumOrder.findIndex(p => b.name.includes(p));
-        const aScore = aIdx >= 0 ? premiumOrder.length - aIdx : -1;
-        const bScore = bIdx >= 0 ? premiumOrder.length - bIdx : -1;
-        return bScore - aScore;
+        return (bIdx >= 0 ? bIdx : -1) - (aIdx >= 0 ? aIdx : -1);
       });
       setVoices(sorted);
       if (sorted.length && !voice) setVoice(sorted[0]);
@@ -256,8 +842,9 @@ function Study({ deck, setView }) {
     setShowAnswer(false);
   }, [shuffled, filter, favorites]);
 
-  useEffect(() => { saveData(`progress_${deck.id}`, progress); }, [progress]);
-  useEffect(() => { saveData(`favorites_${deck.id}`, favorites); }, [favorites]);
+  useEffect(() => { saveLocal(`progress_${deck.id}`, progress); }, [progress]);
+  useEffect(() => { saveLocal(`favorites_${deck.id}`, favorites); }, [favorites]);
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
   useEffect(() => {
     return () => {
@@ -284,38 +871,16 @@ function Study({ deck, setView }) {
   const speak = (text) => {
     return new Promise((resolve) => {
       speechSynthesis.cancel();
-      const processed = text
-        .replace(/\. /g, '. <break> ')
-        .replace(/\? /g, '? <break> ')
-        .replace(/: /g, ': <break> ')
-        .replace(/, /g, ', ')
-        .replace(/\band\b/gi, ', and')
-        .replace(/<break>/g, '...');
+      const processed = text.replace(/\. /g, '... ').replace(/\? /g, '?... ');
       const utterance = new SpeechSynthesisUtterance(processed);
       utterance.rate = speed;
       utterance.pitch = 1.05;
-      utterance.volume = 1.0;
       if (voice) utterance.voice = voice;
       utterance.onend = () => resolve();
       utterance.onerror = () => resolve();
       utteranceRef.current = utterance;
       speechSynthesis.speak(utterance);
     });
-  };
-
-  const handleReplay = () => {
-    const wasPlaying = isPlayingRef.current;
-    handleStop();
-    setShowAnswer(false);
-    setTimeout(() => {
-      if (wasPlaying) {
-        setIsPlaying(true);
-        isPlayingRef.current = true;
-        runAutoPlay(cardIndex, true);
-      } else {
-        speak("Question... " + card.front);
-      }
-    }, 100);
   };
 
   const runAutoPlay = async (startIndex, startWithQuestion = true) => {
@@ -354,9 +919,6 @@ function Study({ deck, setView }) {
     }
     setPhase('idle');
   };
-
-  const isPlayingRef = useRef(false);
-  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
   const handlePlay = () => {
     setIsPlaying(true);
@@ -402,10 +964,23 @@ function Study({ deck, setView }) {
     }
   };
 
+  const handleReplay = () => {
+    const wasPlaying = isPlayingRef.current;
+    handleStop();
+    setShowAnswer(false);
+    setTimeout(() => {
+      if (wasPlaying) {
+        setIsPlaying(true);
+        isPlayingRef.current = true;
+        runAutoPlay(cardIndex, true);
+      } else {
+        speak("Question... " + card.front);
+      }
+    }, 100);
+  };
+
   const handleFlip = () => {
-    if (!isPlaying) {
-      setShowAnswer(!showAnswer);
-    }
+    if (!isPlaying) setShowAnswer(!showAnswer);
   };
 
   const markCard = (status) => {
@@ -415,11 +990,8 @@ function Study({ deck, setView }) {
   const toggleFavorite = () => {
     setFavorites(f => {
       const newFavs = { ...f };
-      if (newFavs[card.front]) {
-        delete newFavs[card.front];
-      } else {
-        newFavs[card.front] = true;
-      }
+      if (newFavs[card.front]) delete newFavs[card.front];
+      else newFavs[card.front] = true;
       return newFavs;
     });
   };
@@ -430,237 +1002,186 @@ function Study({ deck, setView }) {
 
   const renderSource = (source) => {
     if (!source) return null;
-    const isUrl = source.startsWith('http://') || source.startsWith('https://');
+    const isUrl = source.startsWith('http');
     return (
       <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '11px', color: '#64748b' }}>
-        Source: {isUrl
-          ? <a href={source} target="_blank" rel="noopener noreferrer"
-               style={{ color: '#64748b', textDecoration: 'underline' }}
-               onClick={(e) => e.stopPropagation()}>
-              {source}
-            </a>
-          : source
-        }
+        Source: {isUrl ? <a href={source} target="_blank" rel="noopener noreferrer" style={{ color: '#64748b', textDecoration: 'underline' }} onClick={e => e.stopPropagation()}>{source}</a> : source}
       </div>
     );
   };
 
-  const containerStyle = {
-    minHeight: '100vh',
-    background: 'linear-gradient(to bottom, #0f172a, #1e293b)',
-    padding: '16px',
-    fontFamily: 'system-ui',
-    color: '#e2e8f0'
-  };
-
-  const cardStyle = {
-    position: 'relative',
-    background: showAnswer
-      ? 'linear-gradient(135deg, #064e3b, #065f46)'
-      : 'linear-gradient(135deg, #1e3a5f, #1e40af)',
-    borderRadius: '20px',
-    padding: '24px',
-    minHeight: '260px',
-    display: 'flex',
-    flexDirection: 'column',
-    cursor: isPlaying ? 'default' : 'pointer',
-    border: showAnswer ? '2px solid #10b981' : '2px solid #3b82f6',
-    transition: 'all 0.3s ease'
-  };
-
   return (
-    <div style={containerStyle}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #0f172a, #1e293b)', padding: '16px', fontFamily: 'system-ui', color: '#e2e8f0' }}>
       <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-
+        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <button onClick={() => { handleStop(); setView('home'); }}
             style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '12px', padding: '12px 20px', color: '#94a3b8', fontSize: '16px', cursor: 'pointer' }}>
-            {'\u2190'} Back
+            ← Back
           </button>
           <div style={{ textAlign: 'center' }}>
             <div style={{ color: '#f1f5f9', fontWeight: 600 }}>Card {cardIndex + 1} / {order.length}</div>
-            <div style={{ color: '#64748b', fontSize: '13px' }}>{knownCount} mastered {'\u2022'} {favCount} favorited</div>
+            <div style={{ color: '#64748b', fontSize: '13px' }}>{knownCount} mastered • {favCount} favorited</div>
           </div>
           <div style={{ width: '80px' }}></div>
         </div>
 
+        {/* Filters */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-          <button
-            onClick={() => setFilter('all')}
-            style={{
-              flex: 1, padding: '10px', borderRadius: '10px', border: 'none', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+          <button onClick={() => setFilter('all')}
+            style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
               background: filter === 'all' ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.05)',
-              color: filter === 'all' ? '#60a5fa' : '#64748b'
-            }}>
-            All Cards ({deck.cards.length})
+              color: filter === 'all' ? '#60a5fa' : '#64748b' }}>
+            All ({deck.cards.length})
           </button>
-          <button
-            onClick={() => setFilter('favorites')}
-            style={{
-              flex: 1, padding: '10px', borderRadius: '10px', border: 'none', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+          <button onClick={() => setFilter('favorites')}
+            style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
               background: filter === 'favorites' ? 'rgba(251,191,36,0.3)' : 'rgba(255,255,255,0.05)',
-              color: filter === 'favorites' ? '#fbbf24' : '#64748b'
-            }}>
-            {'\u2605'} Favorites ({favCount})
+              color: filter === 'favorites' ? '#fbbf24' : '#64748b' }}>
+            ★ Favorites ({favCount})
           </button>
         </div>
 
-        {filter === 'favorites' && favCount === 0 && (
-          <div style={{ background: 'rgba(30,41,59,0.8)', borderRadius: '16px', padding: '40px 24px', textAlign: 'center', marginBottom: '16px' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>{'\u2605'}</div>
+        {filter === 'favorites' && favCount === 0 ? (
+          <div style={{ background: 'rgba(30,41,59,0.8)', borderRadius: '16px', padding: '40px 24px', textAlign: 'center' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>★</div>
             <h3 style={{ color: '#f1f5f9', marginBottom: '8px' }}>No favorites yet</h3>
-            <p style={{ color: '#64748b', fontSize: '14px' }}>Tap the star on any card to add it to your favorites for quick review</p>
-            <button
-              onClick={() => setFilter('all')}
-              style={{ marginTop: '16px', padding: '12px 24px', borderRadius: '10px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 600, cursor: 'pointer' }}>
+            <p style={{ color: '#64748b', fontSize: '14px' }}>Tap the star on any card to add it</p>
+            <button onClick={() => setFilter('all')} style={{ marginTop: '16px', padding: '12px 24px', borderRadius: '10px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 600, cursor: 'pointer' }}>
               View All Cards
             </button>
           </div>
-        )}
-
-        {(filter !== 'favorites' || favCount > 0) && (
+        ) : (
           <>
-
-        {isPlaying && (
-          <div style={{ background: 'rgba(16,185,129,0.2)', borderRadius: '12px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#10b981', animation: 'pulse 1.5s infinite' }}></div>
-            <span style={{ color: '#10b981', fontWeight: 500 }}>
-              {phase === 'speaking-q' && 'Reading question...'}
-              {phase === 'pause-after-q' && 'Get ready for answer...'}
-              {phase === 'speaking-a' && 'Reading answer...'}
-              {phase === 'pause-after-a' && 'Moving to next card...'}
-            </span>
-          </div>
-        )}
-
-        <div style={cardStyle} onClick={handleFlip}>
-          <button
-            onClick={(e) => { e.stopPropagation(); toggleFavorite(); }}
-            style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', fontSize: '28px', cursor: 'pointer', padding: '4px', filter: isFavorite() ? 'none' : 'grayscale(100%)', opacity: isFavorite() ? 1 : 0.4, transition: 'all 0.2s' }}>
-            {'\u2605'}
-          </button>
-
-          <div style={{ fontSize: '11px', fontWeight: 700, color: showAnswer ? '#6ee7b7' : '#93c5fd', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>
-            {card?.category} {'\u2022'} {showAnswer ? 'ANSWER' : 'QUESTION'}
-          </div>
-
-          <div style={{ flex: 1, fontSize: showAnswer ? '16px' : '20px', lineHeight: 1.6, color: '#f1f5f9' }}>
-            {showAnswer ? card?.back : card?.front}
-          </div>
-
-          {renderSource(card?.source)}
-
-          {!isPlaying && (
-            <div style={{ marginTop: '12px', color: showAnswer ? '#6ee7b7' : '#93c5fd', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              Tap to {showAnswer ? 'see question' : 'reveal answer'}
-              {getStatus() && (
-                <span style={{
-                  padding: '4px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
-                  background: getStatus() === 'known' ? 'rgba(16,185,129,0.3)' : 'rgba(251,191,36,0.3)',
-                  color: getStatus() === 'known' ? '#6ee7b7' : '#fbbf24'
-                }}>
-                  {getStatus() === 'known' ? '\u2713 Mastered' : '\u25CB Learning'}
+            {/* Playing indicator */}
+            {isPlaying && (
+              <div style={{ background: 'rgba(16,185,129,0.2)', borderRadius: '12px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#10b981', animation: 'pulse 1.5s infinite' }}></div>
+                <span style={{ color: '#10b981', fontWeight: 500 }}>
+                  {phase === 'speaking-q' && 'Reading question...'}
+                  {phase === 'pause-after-q' && 'Get ready for answer...'}
+                  {phase === 'speaking-a' && 'Reading answer...'}
+                  {phase === 'pause-after-a' && 'Moving to next card...'}
                 </span>
+              </div>
+            )}
+
+            {/* Card */}
+            <div onClick={handleFlip} style={{
+              position: 'relative',
+              background: showAnswer ? 'linear-gradient(135deg, #064e3b, #065f46)' : 'linear-gradient(135deg, #1e3a5f, #1e40af)',
+              borderRadius: '20px', padding: '24px', minHeight: '260px', display: 'flex', flexDirection: 'column',
+              cursor: isPlaying ? 'default' : 'pointer',
+              border: showAnswer ? '2px solid #10b981' : '2px solid #3b82f6', transition: 'all 0.3s ease'
+            }}>
+              <button onClick={e => { e.stopPropagation(); toggleFavorite(); }}
+                style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', fontSize: '28px', cursor: 'pointer', opacity: isFavorite() ? 1 : 0.4 }}>
+                ★
+              </button>
+
+              <div style={{ fontSize: '11px', fontWeight: 700, color: showAnswer ? '#6ee7b7' : '#93c5fd', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>
+                {card?.category} • {showAnswer ? 'ANSWER' : 'QUESTION'}
+              </div>
+
+              <div style={{ flex: 1, fontSize: showAnswer ? '16px' : '20px', lineHeight: 1.6, color: '#f1f5f9' }}>
+                {showAnswer ? card?.back : card?.front}
+              </div>
+
+              {renderSource(card?.source)}
+
+              {!isPlaying && (
+                <div style={{ marginTop: '12px', color: showAnswer ? '#6ee7b7' : '#93c5fd', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  Tap to {showAnswer ? 'see question' : 'reveal answer'}
+                  {getStatus() && (
+                    <span style={{
+                      padding: '4px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
+                      background: getStatus() === 'known' ? 'rgba(16,185,129,0.3)' : 'rgba(251,191,36,0.3)',
+                      color: getStatus() === 'known' ? '#6ee7b7' : '#fbbf24'
+                    }}>
+                      {getStatus() === 'known' ? '✓ Mastered' : '○ Learning'}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </div>
 
-        {!isPlaying && (
-          <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-            <button onClick={() => markCard('learning')}
-              style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
-                background: getStatus() === 'learning' ? '#f59e0b' : 'rgba(255,255,255,0.1)',
-                color: getStatus() === 'learning' ? 'white' : '#94a3b8'
-              }}>
-              Still Learning
-            </button>
-            <button onClick={() => markCard('known')}
-              style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
-                background: getStatus() === 'known' ? '#10b981' : 'rgba(255,255,255,0.1)',
-                color: getStatus() === 'known' ? 'white' : '#94a3b8'
-              }}>
-              Got It {'\u2713'}
-            </button>
-          </div>
-        )}
+            {/* Mark buttons */}
+            {!isPlaying && (
+              <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                <button onClick={() => markCard('learning')}
+                  style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
+                    background: getStatus() === 'learning' ? '#f59e0b' : 'rgba(255,255,255,0.1)',
+                    color: getStatus() === 'learning' ? 'white' : '#94a3b8' }}>
+                  Still Learning
+                </button>
+                <button onClick={() => markCard('known')}
+                  style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
+                    background: getStatus() === 'known' ? '#10b981' : 'rgba(255,255,255,0.1)',
+                    color: getStatus() === 'known' ? 'white' : '#94a3b8' }}>
+                  Got It ✓
+                </button>
+              </div>
+            )}
 
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px' }}>
-          <button onClick={handlePrev}
-            style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '2px solid rgba(255,255,255,0.2)', color: '#e2e8f0', fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {'\u2039'}
-          </button>
-
-          <button onClick={handleReplay} title="Replay this card"
-            style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(251,191,36,0.2)', border: '2px solid rgba(251,191,36,0.4)', color: '#fbbf24', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {'\u21BA'}
-          </button>
-
-          <button onClick={isPlaying ? handleStop : handlePlay}
-            style={{
-              width: '80px', height: '80px', borderRadius: '50%',
-              background: isPlaying ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #10b981, #059669)',
-              border: 'none', color: 'white', fontSize: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: isPlaying ? '0 0 30px rgba(239,68,68,0.5)' : '0 0 30px rgba(16,185,129,0.5)'
-            }}>
-            {isPlaying ? '\u23F9' : '\u25B6'}
-          </button>
-
-          <button onClick={handleNext}
-            style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '2px solid rgba(255,255,255,0.2)', color: '#e2e8f0', fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {'\u203A'}
-          </button>
-        </div>
-        </>
-        )}
-
-        <div style={{ marginTop: '24px', background: 'rgba(30,41,59,0.8)', borderRadius: '16px', padding: '20px' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center', alignItems: 'center' }}>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#94a3b8', fontSize: '13px' }}>Voice</span>
-              <select
-                value={voice?.name || ''}
-                onChange={e => setVoice(voices.find(v => v.name === e.target.value))}
-                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px 12px', color: '#e2e8f0', fontSize: '13px', maxWidth: '140px' }}>
-                {voices.map(v => (
-                  <option key={v.name} value={v.name}>
-                    {v.name.replace('Microsoft ', '').replace('Google ', '').slice(0, 18)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#94a3b8', fontSize: '13px' }}>Speed</span>
-              <select
-                value={speed}
-                onChange={e => setSpeed(parseFloat(e.target.value))}
-                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px 12px', color: '#e2e8f0', fontSize: '13px' }}>
-                <option value={0.8}>Slow</option>
-                <option value={0.9}>Natural</option>
-                <option value={1.0}>Normal</option>
-                <option value={1.1}>Fast</option>
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#94a3b8', fontSize: '13px' }}>Shuffle</span>
-              <button
-                onClick={() => setShuffled(!shuffled)}
-                style={{ width: '50px', height: '28px', borderRadius: '14px', border: 'none', background: shuffled ? '#3b82f6' : 'rgba(255,255,255,0.1)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s' }}>
-                <div style={{ position: 'absolute', top: '2px', left: shuffled ? '24px' : '2px', width: '24px', height: '24px', borderRadius: '50%', background: 'white', transition: 'left 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}></div>
+            {/* Controls */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px' }}>
+              <button onClick={handlePrev}
+                style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '2px solid rgba(255,255,255,0.2)', color: '#e2e8f0', fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                ‹
+              </button>
+              <button onClick={handleReplay}
+                style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(251,191,36,0.2)', border: '2px solid rgba(251,191,36,0.4)', color: '#fbbf24', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                ↻
+              </button>
+              <button onClick={isPlaying ? handleStop : handlePlay}
+                style={{
+                  width: '80px', height: '80px', borderRadius: '50%',
+                  background: isPlaying ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #10b981, #059669)',
+                  border: 'none', color: 'white', fontSize: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: isPlaying ? '0 0 30px rgba(239,68,68,0.5)' : '0 0 30px rgba(16,185,129,0.5)'
+                }}>
+                {isPlaying ? '⏹' : '▶'}
+              </button>
+              <button onClick={handleNext}
+                style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '2px solid rgba(255,255,255,0.2)', color: '#e2e8f0', fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                ›
               </button>
             </div>
-          </div>
 
-          <p style={{ textAlign: 'center', color: '#64748b', fontSize: '12px', marginTop: '16px', marginBottom: 0 }}>
-            {'\u{1F3A7}'} Headphone controls supported {'\u2022'} {'\u21BA'} Replay current card
-          </p>
-          <p style={{ textAlign: 'center', color: '#4b5563', fontSize: '11px', marginTop: '8px', marginBottom: 0 }}>
-            Tip: "Samantha" or "Karen" on iPhone sound most natural
-          </p>
-        </div>
+            {/* Settings */}
+            <div style={{ marginTop: '24px', background: 'rgba(30,41,59,0.8)', borderRadius: '16px', padding: '20px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: '#94a3b8', fontSize: '13px' }}>Voice</span>
+                  <select value={voice?.name || ''} onChange={e => setVoice(voices.find(v => v.name === e.target.value))}
+                    style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px 12px', color: '#e2e8f0', fontSize: '13px', maxWidth: '140px' }}>
+                    {voices.map(v => <option key={v.name} value={v.name}>{v.name.replace('Microsoft ', '').replace('Google ', '').slice(0, 18)}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: '#94a3b8', fontSize: '13px' }}>Speed</span>
+                  <select value={speed} onChange={e => setSpeed(parseFloat(e.target.value))}
+                    style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px 12px', color: '#e2e8f0', fontSize: '13px' }}>
+                    <option value={0.8}>Slow</option>
+                    <option value={0.9}>Natural</option>
+                    <option value={1.0}>Normal</option>
+                    <option value={1.1}>Fast</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: '#94a3b8', fontSize: '13px' }}>Shuffle</span>
+                  <button onClick={() => setShuffled(!shuffled)}
+                    style={{ width: '50px', height: '28px', borderRadius: '14px', border: 'none', background: shuffled ? '#3b82f6' : 'rgba(255,255,255,0.1)', cursor: 'pointer', position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: '2px', left: shuffled ? '24px' : '2px', width: '24px', height: '24px', borderRadius: '50%', background: 'white', transition: 'left 0.2s' }}></div>
+                  </button>
+                </div>
+              </div>
+              <p style={{ textAlign: 'center', color: '#64748b', fontSize: '12px', marginTop: '16px', marginBottom: 0 }}>
+                🎧 Headphone controls supported
+              </p>
+            </div>
+          </>
+        )}
       </div>
 
       <style>{`
@@ -673,7 +1194,14 @@ function Study({ deck, setView }) {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+// ============================================================
+// RENDER
+// ============================================================
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <AuthProvider>
+    <App />
+  </AuthProvider>
+);
   </script>
 </body>
 </html>
