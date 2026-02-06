@@ -526,12 +526,19 @@ function App() {
 // HOME WITH PLANNER SIDEBAR
 function HomeWithPlanner({ path, setPath, setActiveDeck, setView, user, openaiKey, streakData, showPlanner, setShowPlanner }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 900);
+  const [plannerCollapsed, setPlannerCollapsed] = useState(() => loadLocal('plannerCollapsed', false));
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 900);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const togglePlannerCollapsed = () => {
+    const newVal = !plannerCollapsed;
+    setPlannerCollapsed(newVal);
+    saveLocal('plannerCollapsed', newVal);
+  };
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #0f172a, #1e293b)', display: 'flex' }}>
@@ -542,8 +549,20 @@ function HomeWithPlanner({ path, setPath, setActiveDeck, setView, user, openaiKe
 
       {/* Planner Sidebar - Desktop */}
       {!isMobile && (
-        <div style={{ width: '340px', borderLeft: '1px solid rgba(100,116,139,0.2)', background: 'rgba(15,23,42,0.9)', overflowY: 'auto', maxHeight: '100vh' }}>
-          <RevisionPlanner />
+        <div style={{ width: plannerCollapsed ? '48px' : '340px', borderLeft: '1px solid rgba(100,116,139,0.2)', background: 'rgba(15,23,42,0.9)', overflowY: plannerCollapsed ? 'hidden' : 'auto', maxHeight: '100vh', transition: 'width 0.2s ease', position: 'relative' }}>
+          {/* Collapse/Expand button */}
+          <button onClick={togglePlannerCollapsed} style={{ position: 'absolute', top: '16px', left: plannerCollapsed ? '8px' : '16px', background: 'rgba(139,92,246,0.2)', border: 'none', borderRadius: '6px', padding: '6px 10px', color: '#a78bfa', fontSize: '12px', cursor: 'pointer', zIndex: 10 }}>
+            {plannerCollapsed ? '›' : '‹'}
+          </button>
+          {plannerCollapsed ? (
+            <div style={{ padding: '60px 8px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+              <div style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', color: '#64748b', fontSize: '11px', letterSpacing: '1px' }}>PLANNER</div>
+            </div>
+          ) : (
+            <div style={{ paddingTop: '40px' }}>
+              <RevisionPlanner />
+            </div>
+          )}
         </div>
       )}
 
@@ -1255,12 +1274,23 @@ function RevisionPlanner() {
 
   // Get session position and height for timeline
   const getSessionStyle = (session) => {
-    const startMins = timeToMins(session.startTime);
+    const startTime = session.startTime || '09:00'; // Default to 9am for old sessions
+    const startMins = timeToMins(startTime);
     const dayStartMins = 6 * 60; // 6am
     const top = ((startMins - dayStartMins) / 30) * 28; // 28px per 30-min slot
-    const height = (session.duration / 30) * 28;
+    const height = ((session.duration || 60) / 30) * 28;
     return { top: `${top}px`, height: `${Math.max(height, 20)}px` };
   };
+
+  // Migrate old sessions without startTime
+  useEffect(() => {
+    const needsMigration = sessions.some(s => !s.startTime);
+    if (needsMigration) {
+      const migrated = sessions.map(s => s.startTime ? s : { ...s, startTime: '09:00' });
+      setSessions(migrated);
+      saveRevisionSessions(migrated);
+    }
+  }, []);
 
   // Dragging state
   const [dragSession, setDragSession] = useState(null);
