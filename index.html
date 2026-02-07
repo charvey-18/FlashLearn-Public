@@ -83,6 +83,267 @@ const useExamBoard = () => useContext(ExamBoardContext);
 const saveLocal = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} };
 const loadLocal = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch(e) { return d; } };
 
+// PRACTICE QUESTION GENERATORS
+// Each generator returns { question, answer, hint, acceptableAnswers }
+const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+const lcm = (a, b) => (a * b) / gcd(a, b);
+
+const PRACTICE_GENERATORS = {
+  // Fractions - Adding
+  addFractions: () => {
+    const denoms = [2, 3, 4, 5, 6, 8, 10];
+    const d1 = denoms[Math.floor(Math.random() * denoms.length)];
+    const d2 = denoms[Math.floor(Math.random() * denoms.length)];
+    const n1 = Math.floor(Math.random() * (d1 - 1)) + 1;
+    const n2 = Math.floor(Math.random() * (d2 - 1)) + 1;
+    const commonD = lcm(d1, d2);
+    const resultN = (n1 * (commonD / d1)) + (n2 * (commonD / d2));
+    const g = gcd(resultN, commonD);
+    const simpN = resultN / g;
+    const simpD = commonD / g;
+    const answer = simpD === 1 ? `${simpN}` : `${simpN}/${simpD}`;
+    return {
+      question: `Calculate: ${n1}/${d1} + ${n2}/${d2}`,
+      answer,
+      hint: `Find the common denominator (${commonD}), convert both fractions, then add numerators.`,
+      acceptableAnswers: [answer, `${resultN}/${commonD}`, `${simpN}/${simpD}`]
+    };
+  },
+
+  // Fractions - Subtracting
+  subtractFractions: () => {
+    const denoms = [2, 3, 4, 5, 6, 8];
+    const d1 = denoms[Math.floor(Math.random() * denoms.length)];
+    const d2 = denoms[Math.floor(Math.random() * denoms.length)];
+    let n1 = Math.floor(Math.random() * (d1 - 1)) + 1;
+    let n2 = Math.floor(Math.random() * (d2 - 1)) + 1;
+    // Ensure result is positive
+    const commonD = lcm(d1, d2);
+    if ((n1 * (commonD / d1)) < (n2 * (commonD / d2))) {
+      [n1, n2, d1, d2] = [n2, n1, d2, d1];
+    }
+    const resultN = (n1 * (commonD / d1)) - (n2 * (commonD / d2));
+    const g = gcd(Math.abs(resultN), commonD);
+    const simpN = resultN / g;
+    const simpD = commonD / g;
+    const answer = simpD === 1 ? `${simpN}` : `${simpN}/${simpD}`;
+    return {
+      question: `Calculate: ${n1}/${d1} - ${n2}/${d2}`,
+      answer,
+      hint: `Find the common denominator (${commonD}), convert both fractions, then subtract numerators.`,
+      acceptableAnswers: [answer, `${resultN}/${commonD}`, `${simpN}/${simpD}`]
+    };
+  },
+
+  // Percentages
+  percentageOf: () => {
+    const percentages = [10, 15, 20, 25, 30, 40, 50, 75];
+    const amounts = [40, 60, 80, 100, 120, 150, 200, 250, 300];
+    const percent = percentages[Math.floor(Math.random() * percentages.length)];
+    const amount = amounts[Math.floor(Math.random() * amounts.length)];
+    const answer = (percent / 100) * amount;
+    return {
+      question: `What is ${percent}% of ${amount}?`,
+      answer: `${answer}`,
+      hint: `Divide ${percent} by 100 to get ${percent/100}, then multiply by ${amount}.`,
+      acceptableAnswers: [`${answer}`, answer.toFixed(0), answer.toFixed(1), answer.toFixed(2)]
+    };
+  },
+
+  // Ratio sharing
+  ratioShare: () => {
+    const amounts = [24, 30, 36, 42, 48, 54, 60, 72, 80, 90, 100];
+    const ratios = [[1,2], [1,3], [2,3], [1,4], [3,4], [2,5], [3,5]];
+    const amount = amounts[Math.floor(Math.random() * amounts.length)];
+    const [r1, r2] = ratios[Math.floor(Math.random() * ratios.length)];
+    const total = r1 + r2;
+    const share1 = (amount / total) * r1;
+    const share2 = (amount / total) * r2;
+    if (share1 % 1 !== 0) return PRACTICE_GENERATORS.ratioShare(); // Retry if not whole number
+    return {
+      question: `Share £${amount} in the ratio ${r1}:${r2}. What is the larger share?`,
+      answer: `£${Math.max(share1, share2)}`,
+      hint: `Total parts = ${total}. One part = £${amount}/${total} = £${amount/total}.`,
+      acceptableAnswers: [`£${Math.max(share1, share2)}`, `${Math.max(share1, share2)}`]
+    };
+  },
+
+  // Linear equations
+  solveLinear: () => {
+    const a = Math.floor(Math.random() * 5) + 2;
+    const x = Math.floor(Math.random() * 10) + 1;
+    const b = Math.floor(Math.random() * 10) + 1;
+    const c = a * x + b;
+    return {
+      question: `Solve for x: ${a}x + ${b} = ${c}`,
+      answer: `${x}`,
+      hint: `Subtract ${b} from both sides, then divide by ${a}.`,
+      acceptableAnswers: [`${x}`, `x = ${x}`, `x=${x}`]
+    };
+  },
+
+  // Quadratic (simple factorising)
+  solveQuadratic: () => {
+    const r1 = Math.floor(Math.random() * 6) + 1;
+    const r2 = Math.floor(Math.random() * 6) + 1;
+    const b = r1 + r2;
+    const c = r1 * r2;
+    return {
+      question: `Solve: x² + ${b}x + ${c} = 0`,
+      answer: `x = -${r1} or x = -${r2}`,
+      hint: `Find two numbers that multiply to ${c} and add to ${b}.`,
+      acceptableAnswers: [
+        `x = -${r1} or x = -${r2}`, `x = -${r2} or x = -${r1}`,
+        `-${r1}, -${r2}`, `-${r2}, -${r1}`,
+        `-${r1} and -${r2}`, `-${r2} and -${r1}`,
+        `x=-${r1}, x=-${r2}`, `x=-${r2}, x=-${r1}`
+      ]
+    };
+  },
+
+  // Pythagoras
+  pythagoras: () => {
+    const triples = [[3,4,5], [5,12,13], [6,8,10], [8,15,17], [9,12,15]];
+    const [a, b, c] = triples[Math.floor(Math.random() * triples.length)];
+    const findHypotenuse = Math.random() > 0.5;
+    if (findHypotenuse) {
+      return {
+        question: `A right-angled triangle has sides ${a}cm and ${b}cm. Find the hypotenuse.`,
+        answer: `${c}cm`,
+        hint: `Use Pythagoras: c² = ${a}² + ${b}² = ${a*a} + ${b*b} = ${c*c}`,
+        acceptableAnswers: [`${c}cm`, `${c} cm`, `${c}`]
+      };
+    } else {
+      return {
+        question: `A right-angled triangle has hypotenuse ${c}cm and one side ${a}cm. Find the other side.`,
+        answer: `${b}cm`,
+        hint: `Use Pythagoras: b² = ${c}² - ${a}² = ${c*c} - ${a*a} = ${b*b}`,
+        acceptableAnswers: [`${b}cm`, `${b} cm`, `${b}`]
+      };
+    }
+  },
+
+  // Area of triangle
+  areaTriangle: () => {
+    const bases = [4, 5, 6, 8, 10, 12];
+    const heights = [3, 4, 5, 6, 7, 8];
+    const base = bases[Math.floor(Math.random() * bases.length)];
+    const height = heights[Math.floor(Math.random() * heights.length)];
+    const area = (base * height) / 2;
+    return {
+      question: `Find the area of a triangle with base ${base}cm and height ${height}cm.`,
+      answer: `${area}cm²`,
+      hint: `Area = ½ × base × height = ½ × ${base} × ${height}`,
+      acceptableAnswers: [`${area}cm²`, `${area} cm²`, `${area}cm2`, `${area} cm2`, `${area}`]
+    };
+  },
+
+  // Simple probability
+  probability: () => {
+    const scenarios = [
+      { total: 10, favorable: Math.floor(Math.random() * 4) + 2, context: 'red balls', outOf: 'balls in a bag' },
+      { total: 6, favorable: Math.floor(Math.random() * 3) + 1, context: 'even numbers', outOf: 'sides on a dice' },
+      { total: 52, favorable: 13, context: 'hearts', outOf: 'cards in a deck' },
+      { total: 8, favorable: Math.floor(Math.random() * 4) + 2, context: 'winning tickets', outOf: 'tickets' }
+    ];
+    const s = scenarios[Math.floor(Math.random() * scenarios.length)];
+    const g = gcd(s.favorable, s.total);
+    const simpNum = s.favorable / g;
+    const simpDen = s.total / g;
+    return {
+      question: `There are ${s.favorable} ${s.context} out of ${s.total} ${s.outOf}. What is the probability of picking a ${s.context.slice(0, -1)}?`,
+      answer: `${simpNum}/${simpDen}`,
+      hint: `Probability = favourable outcomes ÷ total outcomes = ${s.favorable}/${s.total}`,
+      acceptableAnswers: [`${simpNum}/${simpDen}`, `${s.favorable}/${s.total}`, (s.favorable/s.total).toFixed(2)]
+    };
+  },
+
+  // Mean calculation
+  calculateMean: () => {
+    const count = Math.floor(Math.random() * 3) + 4; // 4-6 numbers
+    const numbers = [];
+    for (let i = 0; i < count; i++) {
+      numbers.push(Math.floor(Math.random() * 15) + 1);
+    }
+    const sum = numbers.reduce((a, b) => a + b, 0);
+    const mean = sum / count;
+    return {
+      question: `Find the mean of: ${numbers.join(', ')}`,
+      answer: mean % 1 === 0 ? `${mean}` : mean.toFixed(1),
+      hint: `Sum = ${sum}, Count = ${count}. Mean = ${sum}/${count}`,
+      acceptableAnswers: [`${mean}`, mean.toFixed(1), mean.toFixed(2)]
+    };
+  },
+
+  // Percentage increase/decrease
+  percentageChange: () => {
+    const original = [50, 60, 80, 100, 120, 150, 200][Math.floor(Math.random() * 7)];
+    const percent = [10, 15, 20, 25, 30, 40, 50][Math.floor(Math.random() * 7)];
+    const increase = Math.random() > 0.5;
+    const change = (percent / 100) * original;
+    const answer = increase ? original + change : original - change;
+    return {
+      question: increase
+        ? `Increase £${original} by ${percent}%`
+        : `Decrease £${original} by ${percent}%`,
+      answer: `£${answer}`,
+      hint: `${percent}% of ${original} = ${change}. Then ${increase ? 'add' : 'subtract'} from ${original}.`,
+      acceptableAnswers: [`£${answer}`, `${answer}`]
+    };
+  },
+
+  // Speed distance time
+  speedDistanceTime: () => {
+    const speeds = [30, 40, 50, 60, 70, 80];
+    const times = [1, 1.5, 2, 2.5, 3, 4];
+    const speed = speeds[Math.floor(Math.random() * speeds.length)];
+    const time = times[Math.floor(Math.random() * times.length)];
+    const distance = speed * time;
+    const type = Math.floor(Math.random() * 3);
+    if (type === 0) {
+      return {
+        question: `A car travels at ${speed}mph for ${time} hours. How far does it travel?`,
+        answer: `${distance} miles`,
+        hint: `Distance = Speed × Time = ${speed} × ${time}`,
+        acceptableAnswers: [`${distance} miles`, `${distance}miles`, `${distance}`]
+      };
+    } else if (type === 1) {
+      return {
+        question: `A car travels ${distance} miles in ${time} hours. What is its speed?`,
+        answer: `${speed}mph`,
+        hint: `Speed = Distance ÷ Time = ${distance} ÷ ${time}`,
+        acceptableAnswers: [`${speed}mph`, `${speed} mph`, `${speed}`]
+      };
+    } else {
+      return {
+        question: `A car travels ${distance} miles at ${speed}mph. How long does the journey take?`,
+        answer: `${time} hours`,
+        hint: `Time = Distance ÷ Speed = ${distance} ÷ ${speed}`,
+        acceptableAnswers: [`${time} hours`, `${time}hours`, `${time} hrs`, `${time}hrs`, `${time}`]
+      };
+    }
+  }
+};
+
+// Helper to get a random practice question
+const getRandomPractice = (category) => {
+  const categoryMap = {
+    'Fractions': ['addFractions', 'subtractFractions'],
+    'Percentages': ['percentageOf', 'percentageChange'],
+    'Ratios': ['ratioShare'],
+    'Equations': ['solveLinear'],
+    'Quadratics': ['solveQuadratic'],
+    'Pythagoras': ['pythagoras'],
+    'Area': ['areaTriangle'],
+    'Probability': ['probability'],
+    'Averages': ['calculateMean'],
+    'Speed': ['speedDistanceTime']
+  };
+  const generators = categoryMap[category] || Object.keys(PRACTICE_GENERATORS);
+  const genName = generators[Math.floor(Math.random() * generators.length)];
+  return PRACTICE_GENERATORS[genName]();
+};
+
 // FOLDER STRUCTURE
 const FOLDERS = [
   {
@@ -110,12 +371,15 @@ const FOLDERS = [
 
 // DECK DATA - Starting with sample cards (will expand)
 // Cards can have optional 'boards' field: ['AQA'], ['Edexcel'], or ['AQA', 'Edexcel'] (or omit for both)
+// Cards with 'practiceType' will generate interactive practice questions
 const DECKS = {
   // MATHS
   'maths-number': { id: 'maths-number', name: 'Number', icon: '🔢', cards: [
-    { category: "Fractions", front: "How do you add fractions with different denominators?", back: "Find the lowest common denominator (LCD), convert each fraction to have this denominator, then add the numerators. Example: 1/4 + 1/3 = 3/12 + 4/12 = 7/12", source: "GCSE Maths" },
-    { category: "Percentages", front: "How do you find a percentage of an amount?", back: "Divide the percentage by 100 and multiply by the amount. Example: 15% of 80 = 0.15 × 80 = 12. Alternatively, find 10% and 5% then add them.", source: "GCSE Maths" },
-    { category: "Ratios", front: "How do you share an amount in a given ratio?", back: "Add the ratio parts to find total parts. Divide the amount by total parts to find one part. Multiply by each ratio number. Example: Share £60 in ratio 2:3 → 5 parts total, one part = £12, answer = £24:£36", source: "GCSE Maths" },
+    { category: "Fractions", front: "How do you add fractions with different denominators?", back: "Find the lowest common denominator (LCD), convert each fraction to have this denominator, then add the numerators. Example: 1/4 + 1/3 = 3/12 + 4/12 = 7/12", source: "GCSE Maths", practiceType: "addFractions" },
+    { category: "Fractions", front: "How do you subtract fractions?", back: "Find the LCD, convert fractions, then subtract numerators. Example: 3/4 - 1/3 = 9/12 - 4/12 = 5/12", source: "GCSE Maths", practiceType: "subtractFractions" },
+    { category: "Percentages", front: "How do you find a percentage of an amount?", back: "Divide the percentage by 100 and multiply by the amount. Example: 15% of 80 = 0.15 × 80 = 12. Alternatively, find 10% and 5% then add them.", source: "GCSE Maths", practiceType: "percentageOf" },
+    { category: "Percentages", front: "How do you increase or decrease by a percentage?", back: "Find the percentage of the amount, then add (increase) or subtract (decrease). Or use multipliers: increase by 20% = ×1.20, decrease by 15% = ×0.85", source: "GCSE Maths", practiceType: "percentageChange" },
+    { category: "Ratios", front: "How do you share an amount in a given ratio?", back: "Add the ratio parts to find total parts. Divide the amount by total parts to find one part. Multiply by each ratio number. Example: Share £60 in ratio 2:3 → 5 parts total, one part = £12, answer = £24:£36", source: "GCSE Maths", practiceType: "ratioShare" },
     { category: "Standard Form", front: "What is standard form and when is it used?", back: "Standard form writes numbers as A × 10ⁿ where 1 ≤ A < 10. Used for very large or small numbers. Example: 45,000,000 = 4.5 × 10⁷, 0.00032 = 3.2 × 10⁻⁴", source: "GCSE Maths" },
     { category: "Surds", front: "How do you simplify surds?", back: "Find the largest square factor and take its root outside. √50 = √(25×2) = 5√2. To rationalise a denominator, multiply top and bottom by the surd: 1/√3 = √3/3", source: "GCSE Maths" },
     { category: "HCF & LCM", front: "How do you find the HCF and LCM of two numbers?", back: "HCF: Find prime factors, multiply common factors. LCM: Multiply all prime factors at highest powers. Example: 12=2²×3, 18=2×3². HCF=2×3=6, LCM=2²×3²=36", source: "GCSE Maths" },
@@ -125,32 +389,32 @@ const DECKS = {
     { category: "Recurring Decimals", front: "How do you convert recurring decimals to fractions? (Edexcel Higher)", back: "Let x = the recurring decimal. Multiply by 10ⁿ where n = number of recurring digits. Subtract original. Solve. Example: x = 0.333... → 10x = 3.333... → 9x = 3 → x = 1/3", source: "Edexcel GCSE Maths", boards: ["Edexcel"] }
   ]},
   'maths-algebra': { id: 'maths-algebra', name: 'Algebra', icon: '📊', cards: [
-    { category: "Equations", front: "How do you solve a linear equation?", back: "Isolate the variable by performing inverse operations on both sides. Example: 3x + 7 = 22 → 3x = 15 → x = 5. Always check by substituting back.", source: "AQA GCSE Maths" },
-    { category: "Quadratics", front: "What are the three methods for solving quadratic equations?", back: "1) Factorising: x² + 5x + 6 = 0 → (x+2)(x+3) = 0 → x = -2 or -3. 2) Quadratic formula: x = (-b ± √(b²-4ac))/2a. 3) Completing the square.", source: "AQA GCSE Maths" },
-    { category: "Quadratics", front: "What is the quadratic formula?", back: "For ax² + bx + c = 0, x = (-b ± √(b²-4ac)) / 2a. The discriminant b²-4ac tells us: >0 means 2 real roots, =0 means 1 repeated root, <0 means no real roots.", source: "AQA GCSE Maths" },
-    { category: "Sequences", front: "How do you find the nth term of an arithmetic sequence?", back: "nth term = a + (n-1)d where a is the first term and d is the common difference. Example: 3, 7, 11, 15... has a=3, d=4, so nth term = 3 + 4(n-1) = 4n - 1", source: "AQA GCSE Maths" },
-    { category: "Graphs", front: "What is the equation of a straight line?", back: "y = mx + c where m is the gradient and c is the y-intercept. Gradient = rise/run = (y₂-y₁)/(x₂-x₁). Parallel lines have equal gradients. Perpendicular lines have gradients that multiply to -1.", source: "AQA GCSE Maths" },
-    { category: "Inequalities", front: "How do you solve and represent inequalities?", back: "Solve like equations but flip the sign when multiplying/dividing by negative. On a number line: open circle for < or >, filled circle for ≤ or ≥. Example: 2x - 3 > 5 → x > 4", source: "AQA GCSE Maths" },
-    { category: "Simultaneous", front: "How do you solve simultaneous equations?", back: "Elimination: Make coefficients equal, add/subtract to eliminate one variable. Substitution: Rearrange one equation, substitute into other. Example: x + y = 7, 2x - y = 2 → add to get 3x = 9, x = 3, y = 4", source: "AQA GCSE Maths" },
-    { category: "Functions", front: "What does f⁻¹(x) mean and how do you find it?", back: "f⁻¹(x) is the inverse function - it reverses what f(x) does. To find it: replace f(x) with y, swap x and y, rearrange for y. Example: f(x) = 2x + 3 → y = 2x + 3 → x = 2y + 3 → f⁻¹(x) = (x-3)/2", source: "AQA GCSE Maths" }
+    { category: "Equations", front: "How do you solve a linear equation?", back: "Isolate the variable by performing inverse operations on both sides. Example: 3x + 7 = 22 → 3x = 15 → x = 5. Always check by substituting back.", source: "GCSE Maths", practiceType: "solveLinear" },
+    { category: "Quadratics", front: "What are the three methods for solving quadratic equations?", back: "1) Factorising: x² + 5x + 6 = 0 → (x+2)(x+3) = 0 → x = -2 or -3. 2) Quadratic formula: x = (-b ± √(b²-4ac))/2a. 3) Completing the square.", source: "GCSE Maths", practiceType: "solveQuadratic" },
+    { category: "Quadratics", front: "What is the quadratic formula?", back: "For ax² + bx + c = 0, x = (-b ± √(b²-4ac)) / 2a. The discriminant b²-4ac tells us: >0 means 2 real roots, =0 means 1 repeated root, <0 means no real roots.", source: "GCSE Maths" },
+    { category: "Sequences", front: "How do you find the nth term of an arithmetic sequence?", back: "nth term = a + (n-1)d where a is the first term and d is the common difference. Example: 3, 7, 11, 15... has a=3, d=4, so nth term = 3 + 4(n-1) = 4n - 1", source: "GCSE Maths" },
+    { category: "Graphs", front: "What is the equation of a straight line?", back: "y = mx + c where m is the gradient and c is the y-intercept. Gradient = rise/run = (y₂-y₁)/(x₂-x₁). Parallel lines have equal gradients. Perpendicular lines have gradients that multiply to -1.", source: "GCSE Maths" },
+    { category: "Inequalities", front: "How do you solve and represent inequalities?", back: "Solve like equations but flip the sign when multiplying/dividing by negative. On a number line: open circle for < or >, filled circle for ≤ or ≥. Example: 2x - 3 > 5 → x > 4", source: "GCSE Maths" },
+    { category: "Simultaneous", front: "How do you solve simultaneous equations?", back: "Elimination: Make coefficients equal, add/subtract to eliminate one variable. Substitution: Rearrange one equation, substitute into other. Example: x + y = 7, 2x - y = 2 → add to get 3x = 9, x = 3, y = 4", source: "GCSE Maths" },
+    { category: "Functions", front: "What does f⁻¹(x) mean and how do you find it?", back: "f⁻¹(x) is the inverse function - it reverses what f(x) does. To find it: replace f(x) with y, swap x and y, rearrange for y. Example: f(x) = 2x + 3 → y = 2x + 3 → x = 2y + 3 → f⁻¹(x) = (x-3)/2", source: "GCSE Maths" }
   ]},
   'maths-geometry': { id: 'maths-geometry', name: 'Geometry', icon: '📐', cards: [
-    { category: "Angles", front: "What are the angle rules for parallel lines?", back: "Corresponding angles are equal (F-shape). Alternate angles are equal (Z-shape). Co-interior/allied angles sum to 180° (C-shape).", source: "AQA GCSE Maths" },
-    { category: "Pythagoras", front: "State Pythagoras' theorem and when to use it.", back: "a² + b² = c² where c is the hypotenuse. Use in right-angled triangles to find a missing side. To find hypotenuse: c = √(a² + b²). To find shorter side: a = √(c² - b²)", source: "AQA GCSE Maths" },
+    { category: "Angles", front: "What are the angle rules for parallel lines?", back: "Corresponding angles are equal (F-shape). Alternate angles are equal (Z-shape). Co-interior/allied angles sum to 180° (C-shape).", source: "GCSE Maths" },
+    { category: "Pythagoras", front: "State Pythagoras' theorem and when to use it.", back: "a² + b² = c² where c is the hypotenuse. Use in right-angled triangles to find a missing side. To find hypotenuse: c = √(a² + b²). To find shorter side: a = √(c² - b²)", source: "GCSE Maths", practiceType: "pythagoras" },
     { category: "Trigonometry", front: "What are SOHCAHTOA and when do you use each ratio?", back: "Sin = Opposite/Hypotenuse, Cos = Adjacent/Hypotenuse, Tan = Opposite/Adjacent. Use when you have a right-angled triangle with an angle. Label sides relative to the angle you're using.", source: "AQA GCSE Maths" },
     { category: "Circle Theorems", front: "State three key circle theorems.", back: "1) Angle at centre is twice angle at circumference. 2) Angle in a semicircle is 90°. 3) Angles in the same segment are equal. 4) Opposite angles in cyclic quadrilateral sum to 180°.", source: "AQA GCSE Maths" },
     { category: "Transformations", front: "Describe the four types of transformation.", back: "Rotation: needs centre, angle, direction. Reflection: needs mirror line equation. Translation: needs column vector. Enlargement: needs centre and scale factor (negative = invert through centre).", source: "AQA GCSE Maths" },
-    { category: "Area", front: "What are the area formulas for common shapes?", back: "Triangle: ½bh or ½ab sinC. Parallelogram: bh. Trapezium: ½(a+b)h. Circle: πr². Sector: (θ/360)πr². For composite shapes, split into known shapes.", source: "AQA GCSE Maths" },
-    { category: "Volume", front: "What are the volume formulas for 3D shapes?", back: "Prism: cross-section area × length. Cylinder: πr²h. Cone: ⅓πr²h. Sphere: (4/3)πr³. Pyramid: ⅓ × base area × height.", source: "AQA GCSE Maths" },
+    { category: "Area", front: "What are the area formulas for common shapes?", back: "Triangle: ½bh or ½ab sinC. Parallelogram: bh. Trapezium: ½(a+b)h. Circle: πr². Sector: (θ/360)πr². For composite shapes, split into known shapes.", source: "GCSE Maths", practiceType: "areaTriangle" },
+    { category: "Volume", front: "What are the volume formulas for 3D shapes?", back: "Prism: cross-section area × length. Cylinder: πr²h. Cone: ⅓πr²h. Sphere: (4/3)πr³. Pyramid: ⅓ × base area × height.", source: "GCSE Maths" },
     { category: "Vectors", front: "How do you add and subtract vectors?", back: "Add/subtract corresponding components. If a = (2,3) and b = (4,1), then a + b = (6,4). The vector from A to B is b - a. Parallel vectors are scalar multiples of each other.", source: "AQA GCSE Maths" }
   ]},
   'maths-stats': { id: 'maths-stats', name: 'Statistics & Probability', icon: '📈', cards: [
-    { category: "Averages", front: "Define mean, median, mode and range.", back: "Mean: sum of values ÷ number of values. Median: middle value when ordered. Mode: most common value. Range: highest - lowest. For grouped data, use midpoints for mean.", source: "AQA GCSE Maths" },
-    { category: "Probability", front: "How do you calculate probability?", back: "P(event) = favourable outcomes ÷ total outcomes. Probability is between 0 and 1. P(not A) = 1 - P(A). For independent events: P(A and B) = P(A) × P(B).", source: "AQA GCSE Maths" },
-    { category: "Tree Diagrams", front: "When and how do you use a tree diagram?", back: "Use for multi-stage probability problems. Each branch shows an outcome and its probability. Multiply along branches for 'and'. Add final probabilities for 'or'. Branches from same point sum to 1.", source: "AQA GCSE Maths" },
-    { category: "Sampling", front: "What is the difference between random and stratified sampling?", back: "Random: every item has equal chance of selection. Stratified: sample proportionally from each group. Stratified formula: (group size ÷ population) × sample size.", source: "AQA GCSE Maths" },
-    { category: "Cumulative Frequency", front: "How do you draw and use a cumulative frequency graph?", back: "Plot cumulative totals against upper class boundaries. Join with smooth curve. Read median at n/2, LQ at n/4, UQ at 3n/4. IQR = UQ - LQ.", source: "AQA GCSE Maths" },
-    { category: "Histograms", front: "How are histograms different from bar charts?", back: "Histograms have continuous data with no gaps. Frequency density = frequency ÷ class width. Area of bar represents frequency, not height. Bars can have different widths.", source: "AQA GCSE Maths" }
+    { category: "Averages", front: "Define mean, median, mode and range.", back: "Mean: sum of values ÷ number of values. Median: middle value when ordered. Mode: most common value. Range: highest - lowest. For grouped data, use midpoints for mean.", source: "GCSE Maths", practiceType: "calculateMean" },
+    { category: "Probability", front: "How do you calculate probability?", back: "P(event) = favourable outcomes ÷ total outcomes. Probability is between 0 and 1. P(not A) = 1 - P(A). For independent events: P(A and B) = P(A) × P(B).", source: "GCSE Maths", practiceType: "probability" },
+    { category: "Tree Diagrams", front: "When and how do you use a tree diagram?", back: "Use for multi-stage probability problems. Each branch shows an outcome and its probability. Multiply along branches for 'and'. Add final probabilities for 'or'. Branches from same point sum to 1.", source: "GCSE Maths" },
+    { category: "Sampling", front: "What is the difference between random and stratified sampling?", back: "Random: every item has equal chance of selection. Stratified: sample proportionally from each group. Stratified formula: (group size ÷ population) × sample size.", source: "GCSE Maths" },
+    { category: "Cumulative Frequency", front: "How do you draw and use a cumulative frequency graph?", back: "Plot cumulative totals against upper class boundaries. Join with smooth curve. Read median at n/2, LQ at n/4, UQ at 3n/4. IQR = UQ - LQ.", source: "GCSE Maths" },
+    { category: "Histograms", front: "How are histograms different from bar charts?", back: "Histograms have continuous data with no gaps. Frequency density = frequency ÷ class width. Area of bar represents frequency, not height. Bars can have different widths.", source: "GCSE Maths" }
   ]},
   // BIOLOGY
   'bio-cells': { id: 'bio-cells', name: 'Cell Biology', icon: '🔬', cards: [
@@ -1404,7 +1668,11 @@ function QuizMode({ deck, setView, quizCards, quizTitle, returnTo }) {
   const [quizComplete, setQuizComplete] = useState(false);
   const [answers, setAnswers] = useState([]); // Track each answer for detailed results
   const [showDetailedResults, setShowDetailedResults] = useState(false);
+  const [userInput, setUserInput] = useState('');
+  const [showHint, setShowHint] = useState(false);
+  const [practiceData, setPracticeData] = useState(null); // For practice questions
   const timerRef = useRef(null);
+  const inputRef = useRef(null);
 
   // Use quizCards if provided (from home page quiz), otherwise use deck.cards
   // Always filter by exam board
@@ -1419,6 +1687,20 @@ function QuizMode({ deck, setView, quizCards, quizTitle, returnTo }) {
     setQuestions(shuffled);
   }, []);
 
+  // Generate practice question when we move to a new question with practiceType
+  useEffect(() => {
+    if (questions.length > 0 && questions[currentQ]?.practiceType) {
+      const generator = PRACTICE_GENERATORS[questions[currentQ].practiceType];
+      if (generator) {
+        setPracticeData(generator());
+      }
+    } else {
+      setPracticeData(null);
+    }
+    setUserInput('');
+    setShowHint(false);
+  }, [currentQ, questions]);
+
   useEffect(() => {
     if (!quizComplete && questions.length > 0 && !answered) {
       timerRef.current = setInterval(() => {
@@ -1431,15 +1713,25 @@ function QuizMode({ deck, setView, quizCards, quizTitle, returnTo }) {
     return () => clearInterval(timerRef.current);
   }, [currentQ, answered, quizComplete]);
 
-  const handleAnswer = (correct, fromTimer = false) => {
+  // Focus input when practice question appears
+  useEffect(() => {
+    if (practiceData && inputRef.current && !showResult) {
+      inputRef.current.focus();
+    }
+  }, [practiceData, showResult]);
+
+  const handleAnswer = (correct, fromTimer = false, userAnswer = '') => {
     clearInterval(timerRef.current);
     setAnswered(true);
     setShowResult(true);
     if (correct) setScore(s => s + 1);
     // Track the answer
-    setAnswers(prev => [...prev, { question: questions[currentQ], correct, timedOut: fromTimer }]);
+    const questionData = practiceData
+      ? { ...questions[currentQ], front: practiceData.question, back: practiceData.answer, userAnswer }
+      : questions[currentQ];
+    setAnswers(prev => [...prev, { question: questionData, correct, timedOut: fromTimer, userAnswer }]);
 
-    // Auto-advance after a brief delay when user clicks right/wrong
+    // Auto-advance after a brief delay when user clicks right/wrong (or for practice questions)
     if (!fromTimer) {
       setTimeout(() => {
         if (currentQ + 1 >= questions.length) {
@@ -1450,7 +1742,22 @@ function QuizMode({ deck, setView, quizCards, quizTitle, returnTo }) {
           setShowResult(false);
           setTimeLeft(30);
         }
-      }, 800);
+      }, practiceData ? 1500 : 800);
+    }
+  };
+
+  const checkPracticeAnswer = () => {
+    if (!practiceData || !userInput.trim()) return;
+    const normalizedInput = userInput.trim().toLowerCase().replace(/\s+/g, '');
+    const isCorrect = practiceData.acceptableAnswers.some(ans =>
+      ans.toLowerCase().replace(/\s+/g, '') === normalizedInput
+    );
+    handleAnswer(isCorrect, false, userInput.trim());
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && practiceData && userInput.trim()) {
+      checkPracticeAnswer();
     }
   };
 
@@ -1518,6 +1825,9 @@ function QuizMode({ deck, setView, quizCards, quizTitle, returnTo }) {
                     <div key={i} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '10px', padding: '14px', marginBottom: '10px' }}>
                       <div style={{ color: '#f87171', fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', marginBottom: '6px' }}>{a.question.category} {a.timedOut && '• Timed out'}</div>
                       <div style={{ color: '#f1f5f9', fontSize: '14px', marginBottom: '10px' }}>{a.question.front}</div>
+                      {a.userAnswer && (
+                        <div style={{ color: '#f87171', fontSize: '12px', marginBottom: '8px' }}>Your answer: {a.userAnswer}</div>
+                      )}
                       <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '10px' }}>
                         <div style={{ color: '#10b981', fontSize: '10px', fontWeight: 600, marginBottom: '4px' }}>CORRECT ANSWER</div>
                         <div style={{ color: '#cbd5e1', fontSize: '13px', lineHeight: 1.4 }}>{a.question.back}</div>
@@ -1538,6 +1848,9 @@ function QuizMode({ deck, setView, quizCards, quizTitle, returnTo }) {
                     <div key={i} style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '10px', padding: '14px', marginBottom: '10px' }}>
                       <div style={{ color: '#34d399', fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', marginBottom: '6px' }}>{a.question.category}</div>
                       <div style={{ color: '#f1f5f9', fontSize: '14px' }}>{a.question.front}</div>
+                      {a.userAnswer && (
+                        <div style={{ color: '#34d399', fontSize: '12px', marginTop: '6px' }}>Your answer: {a.userAnswer}</div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1552,6 +1865,8 @@ function QuizMode({ deck, setView, quizCards, quizTitle, returnTo }) {
   }
 
   const q = questions[currentQ];
+  const isPractice = practiceData !== null;
+
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #0f172a, #1e293b)', padding: '20px' }}>
       <div style={{ maxWidth: '500px', margin: '0 auto' }}>
@@ -1567,15 +1882,70 @@ function QuizMode({ deck, setView, quizCards, quizTitle, returnTo }) {
         </div>
 
         {/* Quiz title */}
-        <div style={{ color: '#64748b', fontSize: '12px', textAlign: 'center', marginBottom: '12px' }}>{title}</div>
+        <div style={{ color: '#64748b', fontSize: '12px', textAlign: 'center', marginBottom: '12px' }}>
+          {title} {isPractice && <span style={{ color: '#8b5cf6' }}>• Practice Question</span>}
+        </div>
 
         {/* Question */}
         <div style={{ background: 'rgba(30,41,59,0.9)', borderRadius: '16px', padding: '24px', marginBottom: '20px' }}>
           <div style={{ color: '#60a5fa', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', marginBottom: '12px' }}>{q.category}</div>
-          <div style={{ color: '#f1f5f9', fontSize: '18px', lineHeight: 1.6 }}>{q.front}</div>
+          {isPractice ? (
+            <>
+              <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '12px', fontStyle: 'italic' }}>{q.front}</div>
+              <div style={{ color: '#f1f5f9', fontSize: '20px', lineHeight: 1.6, fontWeight: 600 }}>{practiceData.question}</div>
+            </>
+          ) : (
+            <div style={{ color: '#f1f5f9', fontSize: '18px', lineHeight: 1.6 }}>{q.front}</div>
+          )}
         </div>
 
-        {showResult ? (
+        {/* Practice input mode */}
+        {isPractice && !showResult && (
+          <div>
+            <input
+              ref={inputRef}
+              type="text"
+              value={userInput}
+              onChange={(e) => setUserInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Type your answer..."
+              style={{ width: '100%', padding: '16px', borderRadius: '10px', border: '2px solid rgba(139,92,246,0.3)', background: 'rgba(30,41,59,0.9)', color: '#f1f5f9', fontSize: '18px', marginBottom: '12px', outline: 'none' }}
+            />
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+              <button onClick={checkPracticeAnswer} disabled={!userInput.trim()} style={{ flex: 2, padding: '14px', borderRadius: '10px', border: 'none', background: userInput.trim() ? '#8b5cf6' : 'rgba(139,92,246,0.3)', color: 'white', fontSize: '15px', fontWeight: 600, cursor: userInput.trim() ? 'pointer' : 'not-allowed' }}>Submit Answer</button>
+              <button onClick={() => setShowHint(!showHint)} style={{ flex: 1, padding: '14px', borderRadius: '10px', border: 'none', background: 'rgba(251,191,36,0.2)', color: '#fbbf24', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>{showHint ? 'Hide' : 'Hint'}</button>
+            </div>
+            {showHint && (
+              <div style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
+                <div style={{ color: '#fbbf24', fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>HINT</div>
+                <div style={{ color: '#fcd34d', fontSize: '13px' }}>{practiceData.hint}</div>
+              </div>
+            )}
+            <button onClick={() => { setShowResult(true); clearInterval(timerRef.current); }} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'rgba(255,255,255,0.05)', color: '#64748b', fontSize: '14px', cursor: 'pointer' }}>Skip & Show Answer</button>
+          </div>
+        )}
+
+        {/* Practice result */}
+        {isPractice && showResult && (
+          <div>
+            <div style={{ background: answered && answers[answers.length - 1]?.correct ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)', border: `1px solid ${answered && answers[answers.length - 1]?.correct ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'}`, borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
+              <div style={{ color: answered && answers[answers.length - 1]?.correct ? '#10b981' : '#ef4444', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>
+                {answered && answers[answers.length - 1]?.correct ? '✓ Correct!' : '✗ Incorrect'}
+              </div>
+              {userInput && !answers[answers.length - 1]?.correct && (
+                <div style={{ color: '#f87171', fontSize: '13px', marginBottom: '8px' }}>Your answer: {userInput}</div>
+              )}
+              <div style={{ color: '#10b981', fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>CORRECT ANSWER</div>
+              <div style={{ color: '#f1f5f9', fontSize: '16px', fontWeight: 600 }}>{practiceData.answer}</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: '10px', color: '#64748b', fontSize: '14px' }}>
+              Moving to next question...
+            </div>
+          </div>
+        )}
+
+        {/* Standard flashcard mode */}
+        {!isPractice && showResult && (
           <div>
             <div style={{ background: 'rgba(30,41,59,0.9)', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
               <div style={{ color: '#10b981', fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>ANSWER</div>
@@ -1592,7 +1962,9 @@ function QuizMode({ deck, setView, quizCards, quizTitle, returnTo }) {
               </div>
             )}
           </div>
-        ) : (
+        )}
+
+        {!isPractice && !showResult && (
           <div style={{ display: 'flex', gap: '12px' }}>
             <button onClick={() => handleAnswer(false)} style={{ flex: 1, padding: '16px', borderRadius: '10px', border: 'none', background: 'rgba(239,68,68,0.2)', color: '#f87171', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}>Don't Know</button>
             <button onClick={() => { setShowResult(true); clearInterval(timerRef.current); }} style={{ flex: 1, padding: '16px', borderRadius: '10px', border: 'none', background: 'rgba(16,185,129,0.2)', color: '#34d399', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}>Show Answer</button>
