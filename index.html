@@ -41,6 +41,44 @@ function AuthProvider({ children }) {
 }
 const useAuth = () => useContext(AuthContext);
 
+// Exam Board Context - Global state for selected exam board
+const ExamBoardContext = createContext(null);
+function ExamBoardProvider({ children }) {
+  const [examBoard, setExamBoard] = useState(() => loadLocal('examBoard', 'AQA'));
+
+  const changeExamBoard = (board) => {
+    setExamBoard(board);
+    saveLocal('examBoard', board);
+  };
+
+  // Filter cards based on selected exam board
+  // Cards without a 'boards' field are shown for all boards
+  const filterCardsByBoard = (cards) => {
+    if (!cards) return [];
+    return cards.filter(card => {
+      if (!card.boards) return true; // No boards specified = available for all
+      return card.boards.includes(examBoard);
+    });
+  };
+
+  // Get a deck with filtered cards
+  const getFilteredDeck = (deck) => {
+    if (!deck) return null;
+    return {
+      ...deck,
+      cards: filterCardsByBoard(deck.cards),
+      originalCardCount: deck.cards?.length || 0
+    };
+  };
+
+  return (
+    <ExamBoardContext.Provider value={{ examBoard, changeExamBoard, filterCardsByBoard, getFilteredDeck }}>
+      {children}
+    </ExamBoardContext.Provider>
+  );
+}
+const useExamBoard = () => useContext(ExamBoardContext);
+
 // Helpers
 const saveLocal = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} };
 const loadLocal = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch(e) { return d; } };
@@ -71,17 +109,20 @@ const FOLDERS = [
 ];
 
 // DECK DATA - Starting with sample cards (will expand)
+// Cards can have optional 'boards' field: ['AQA'], ['Edexcel'], or ['AQA', 'Edexcel'] (or omit for both)
 const DECKS = {
   // MATHS
   'maths-number': { id: 'maths-number', name: 'Number', icon: '🔢', cards: [
-    { category: "Fractions", front: "How do you add fractions with different denominators?", back: "Find the lowest common denominator (LCD), convert each fraction to have this denominator, then add the numerators. Example: 1/4 + 1/3 = 3/12 + 4/12 = 7/12", source: "AQA GCSE Maths" },
-    { category: "Percentages", front: "How do you find a percentage of an amount?", back: "Divide the percentage by 100 and multiply by the amount. Example: 15% of 80 = 0.15 × 80 = 12. Alternatively, find 10% and 5% then add them.", source: "AQA GCSE Maths" },
-    { category: "Ratios", front: "How do you share an amount in a given ratio?", back: "Add the ratio parts to find total parts. Divide the amount by total parts to find one part. Multiply by each ratio number. Example: Share £60 in ratio 2:3 → 5 parts total, one part = £12, answer = £24:£36", source: "AQA GCSE Maths" },
-    { category: "Standard Form", front: "What is standard form and when is it used?", back: "Standard form writes numbers as A × 10ⁿ where 1 ≤ A < 10. Used for very large or small numbers. Example: 45,000,000 = 4.5 × 10⁷, 0.00032 = 3.2 × 10⁻⁴", source: "AQA GCSE Maths" },
-    { category: "Surds", front: "How do you simplify surds?", back: "Find the largest square factor and take its root outside. √50 = √(25×2) = 5√2. To rationalise a denominator, multiply top and bottom by the surd: 1/√3 = √3/3", source: "AQA GCSE Maths" },
-    { category: "HCF & LCM", front: "How do you find the HCF and LCM of two numbers?", back: "HCF: Find prime factors, multiply common factors. LCM: Multiply all prime factors at highest powers. Example: 12=2²×3, 18=2×3². HCF=2×3=6, LCM=2²×3²=36", source: "AQA GCSE Maths" },
-    { category: "Indices", front: "What are the laws of indices?", back: "aᵐ × aⁿ = aᵐ⁺ⁿ, aᵐ ÷ aⁿ = aᵐ⁻ⁿ, (aᵐ)ⁿ = aᵐⁿ, a⁰ = 1, a⁻ⁿ = 1/aⁿ, a^(1/n) = ⁿ√a", source: "AQA GCSE Maths" },
-    { category: "Bounds", front: "What are upper and lower bounds?", back: "For a measurement rounded to a given degree, lower bound is 0.5 units below, upper bound is 0.5 units above. Example: 3.4m to 1dp has bounds 3.35m ≤ x < 3.45m", source: "AQA GCSE Maths" }
+    { category: "Fractions", front: "How do you add fractions with different denominators?", back: "Find the lowest common denominator (LCD), convert each fraction to have this denominator, then add the numerators. Example: 1/4 + 1/3 = 3/12 + 4/12 = 7/12", source: "GCSE Maths" },
+    { category: "Percentages", front: "How do you find a percentage of an amount?", back: "Divide the percentage by 100 and multiply by the amount. Example: 15% of 80 = 0.15 × 80 = 12. Alternatively, find 10% and 5% then add them.", source: "GCSE Maths" },
+    { category: "Ratios", front: "How do you share an amount in a given ratio?", back: "Add the ratio parts to find total parts. Divide the amount by total parts to find one part. Multiply by each ratio number. Example: Share £60 in ratio 2:3 → 5 parts total, one part = £12, answer = £24:£36", source: "GCSE Maths" },
+    { category: "Standard Form", front: "What is standard form and when is it used?", back: "Standard form writes numbers as A × 10ⁿ where 1 ≤ A < 10. Used for very large or small numbers. Example: 45,000,000 = 4.5 × 10⁷, 0.00032 = 3.2 × 10⁻⁴", source: "GCSE Maths" },
+    { category: "Surds", front: "How do you simplify surds?", back: "Find the largest square factor and take its root outside. √50 = √(25×2) = 5√2. To rationalise a denominator, multiply top and bottom by the surd: 1/√3 = √3/3", source: "GCSE Maths" },
+    { category: "HCF & LCM", front: "How do you find the HCF and LCM of two numbers?", back: "HCF: Find prime factors, multiply common factors. LCM: Multiply all prime factors at highest powers. Example: 12=2²×3, 18=2×3². HCF=2×3=6, LCM=2²×3²=36", source: "GCSE Maths" },
+    { category: "Indices", front: "What are the laws of indices?", back: "aᵐ × aⁿ = aᵐ⁺ⁿ, aᵐ ÷ aⁿ = aᵐ⁻ⁿ, (aᵐ)ⁿ = aᵐⁿ, a⁰ = 1, a⁻ⁿ = 1/aⁿ, a^(1/n) = ⁿ√a", source: "GCSE Maths" },
+    { category: "Bounds", front: "What are upper and lower bounds?", back: "For a measurement rounded to a given degree, lower bound is 0.5 units below, upper bound is 0.5 units above. Example: 3.4m to 1dp has bounds 3.35m ≤ x < 3.45m", source: "GCSE Maths" },
+    { category: "Error Intervals", front: "What is an error interval? (AQA specific)", back: "An error interval shows the range of possible values for a rounded number. Written as inequality: for 7.3 (1dp), error interval is 7.25 ≤ x < 7.35", source: "AQA GCSE Maths", boards: ["AQA"] },
+    { category: "Recurring Decimals", front: "How do you convert recurring decimals to fractions? (Edexcel Higher)", back: "Let x = the recurring decimal. Multiply by 10ⁿ where n = number of recurring digits. Subtract original. Solve. Example: x = 0.333... → 10x = 3.333... → 9x = 3 → x = 1/3", source: "Edexcel GCSE Maths", boards: ["Edexcel"] }
   ]},
   'maths-algebra': { id: 'maths-algebra', name: 'Algebra', icon: '📊', cards: [
     { category: "Equations", front: "How do you solve a linear equation?", back: "Isolate the variable by performing inverse operations on both sides. Example: 3x + 7 = 22 → 3x = 15 → x = 5. Always check by substituting back.", source: "AQA GCSE Maths" },
@@ -113,14 +154,16 @@ const DECKS = {
   ]},
   // BIOLOGY
   'bio-cells': { id: 'bio-cells', name: 'Cell Biology', icon: '🔬', cards: [
-    { category: "Cell Structure", front: "What are the parts of an animal cell and their functions?", back: "Nucleus: contains DNA, controls cell. Cytoplasm: where reactions occur. Cell membrane: controls what enters/leaves. Mitochondria: aerobic respiration. Ribosomes: protein synthesis.", source: "AQA GCSE Biology" },
-    { category: "Cell Structure", front: "What extra structures do plant cells have?", back: "Cell wall: made of cellulose, provides support. Vacuole: contains cell sap, maintains turgor. Chloroplasts: contain chlorophyll for photosynthesis. These are in addition to all animal cell parts.", source: "AQA GCSE Biology" },
-    { category: "Microscopy", front: "How do you calculate magnification?", back: "Magnification = Image size ÷ Actual size. Rearrange to find any value. Convert units to be the same (usually μm). 1mm = 1000μm. Remember to use the formula triangle.", source: "AQA GCSE Biology" },
-    { category: "Cell Division", front: "What happens during mitosis?", back: "Produces two identical diploid cells. Stages: DNA replicates, chromosomes line up, spindle fibres pull them apart, two nuclei form, cytoplasm divides. Used for growth, repair, and asexual reproduction.", source: "AQA GCSE Biology" },
-    { category: "Cell Division", front: "What is the difference between mitosis and meiosis?", back: "Mitosis: 1 division, 2 identical diploid cells, for growth/repair. Meiosis: 2 divisions, 4 different haploid cells (gametes), introduces variation through crossing over and independent assortment.", source: "AQA GCSE Biology" },
-    { category: "Transport", front: "Define diffusion, osmosis and active transport.", back: "Diffusion: net movement from high to low concentration. Osmosis: diffusion of water across partially permeable membrane. Active transport: movement against concentration gradient using energy from respiration.", source: "AQA GCSE Biology" },
-    { category: "Specialised Cells", front: "How are sperm cells adapted for their function?", back: "Tail for swimming. Mitochondria for energy. Acrosome with enzymes to penetrate egg. Streamlined head. Haploid nucleus to combine with egg. Minimal cytoplasm to reduce weight.", source: "AQA GCSE Biology" },
-    { category: "Stem Cells", front: "What are stem cells and why are they useful?", back: "Undifferentiated cells that can become specialised. Embryonic stem cells can become any cell type. Adult stem cells are more limited. Used to treat diseases like leukaemia. Ethical concerns about embryo use.", source: "AQA GCSE Biology" }
+    { category: "Cell Structure", front: "What are the parts of an animal cell and their functions?", back: "Nucleus: contains DNA, controls cell. Cytoplasm: where reactions occur. Cell membrane: controls what enters/leaves. Mitochondria: aerobic respiration. Ribosomes: protein synthesis.", source: "GCSE Biology" },
+    { category: "Cell Structure", front: "What extra structures do plant cells have?", back: "Cell wall: made of cellulose, provides support. Vacuole: contains cell sap, maintains turgor. Chloroplasts: contain chlorophyll for photosynthesis. These are in addition to all animal cell parts.", source: "GCSE Biology" },
+    { category: "Microscopy", front: "How do you calculate magnification?", back: "Magnification = Image size ÷ Actual size. Rearrange to find any value. Convert units to be the same (usually μm). 1mm = 1000μm. Remember to use the formula triangle.", source: "GCSE Biology" },
+    { category: "Cell Division", front: "What happens during mitosis?", back: "Produces two identical diploid cells. Stages: DNA replicates, chromosomes line up, spindle fibres pull them apart, two nuclei form, cytoplasm divides. Used for growth, repair, and asexual reproduction.", source: "GCSE Biology" },
+    { category: "Cell Division", front: "What is the difference between mitosis and meiosis?", back: "Mitosis: 1 division, 2 identical diploid cells, for growth/repair. Meiosis: 2 divisions, 4 different haploid cells (gametes), introduces variation through crossing over and independent assortment.", source: "GCSE Biology" },
+    { category: "Transport", front: "Define diffusion, osmosis and active transport.", back: "Diffusion: net movement from high to low concentration. Osmosis: diffusion of water across partially permeable membrane. Active transport: movement against concentration gradient using energy from respiration.", source: "GCSE Biology" },
+    { category: "Specialised Cells", front: "How are sperm cells adapted for their function?", back: "Tail for swimming. Mitochondria for energy. Acrosome with enzymes to penetrate egg. Streamlined head. Haploid nucleus to combine with egg. Minimal cytoplasm to reduce weight.", source: "GCSE Biology" },
+    { category: "Stem Cells", front: "What are stem cells and why are they useful?", back: "Undifferentiated cells that can become specialised. Embryonic stem cells can become any cell type. Adult stem cells are more limited. Used to treat diseases like leukaemia. Ethical concerns about embryo use.", source: "GCSE Biology" },
+    { category: "Required Practical", front: "Describe the AQA required practical for microscopy.", back: "Use a light microscope to observe plant and animal cells. Prepare slides using iodine for onion cells or methylene blue for cheek cells. Calculate magnification and real size of cells.", source: "AQA GCSE Biology", boards: ["AQA"] },
+    { category: "Core Practical", front: "Describe the Edexcel core practical for investigating osmosis.", back: "Cut potato cylinders of equal size. Place in different concentrations of sucrose solution. Leave for set time, then measure length/mass change. Plot graph to find concentration where no change occurs.", source: "Edexcel GCSE Biology", boards: ["Edexcel"] }
   ]},
   'bio-organisation': { id: 'bio-organisation', name: 'Organisation', icon: '🫀', cards: [
     { category: "Organisation", front: "What is the hierarchy of organisation in organisms?", back: "Cells → Tissues → Organs → Organ systems → Organism. Cells are the basic unit. Tissues are groups of similar cells. Organs contain different tissues. Organ systems work together.", source: "AQA GCSE Biology" },
@@ -587,17 +630,21 @@ function HomeWithPlanner({ path, setPath, setActiveDeck, setView, user, openaiKe
 
 // QUICK QUIZ SECTION - Quiz from home page with subject selection
 function QuickQuizSection({ setView, setQuizData }) {
+  const { examBoard, filterCardsByBoard } = useExamBoard();
   const [expanded, setExpanded] = useState(false);
   const [quizMode, setQuizMode] = useState('subjects'); // 'subjects' or 'favorites'
   const [selectedSubjects, setSelectedSubjects] = useState([]);
 
-  // Get all subjects (folders with decks) for selection
+  // Get all subjects (folders with decks) for selection - with filtered card counts
   const getAllSubjects = () => {
     const subjects = [];
     const traverse = (folder, parentPath = '') => {
       const path = parentPath ? `${parentPath} > ${folder.name}` : folder.name;
       if (folder.deckIds && folder.deckIds.length > 0) {
-        const cardCount = folder.deckIds.reduce((sum, id) => sum + (DECKS[id]?.cards?.length || 0), 0);
+        const cardCount = folder.deckIds.reduce((sum, id) => {
+          const filtered = filterCardsByBoard(DECKS[id]?.cards || []);
+          return sum + filtered.length;
+        }, 0);
         subjects.push({ id: folder.id, name: folder.name, path, icon: folder.icon, deckIds: folder.deckIds, cardCount });
       }
       if (folder.children) {
@@ -608,14 +655,15 @@ function QuickQuizSection({ setView, setQuizData }) {
     return subjects;
   };
 
-  // Get all favorited cards
+  // Get all favorited cards - filtered by exam board
   const getFavoriteCards = () => {
     const cards = [];
     Object.keys(DECKS).forEach(deckId => {
       const deck = DECKS[deckId];
       if (!deck.cards || deck.cards.length === 0) return;
+      const filteredDeckCards = filterCardsByBoard(deck.cards);
       const favorites = loadLocal(`favorites_${deckId}`, {});
-      deck.cards.forEach(card => {
+      filteredDeckCards.forEach(card => {
         if (favorites[card.front]) {
           cards.push({ ...card, deckName: deck.name });
         }
@@ -638,17 +686,18 @@ function QuickQuizSection({ setView, setQuizData }) {
     let title = '';
 
     if (quizMode === 'favorites') {
-      cards = favoriteCards;
+      cards = favoriteCards; // Already filtered by board
       title = 'Favourites Quiz';
     } else {
-      // Collect cards from selected subjects
+      // Collect cards from selected subjects - filtered by exam board
       selectedSubjects.forEach(subjectId => {
         const subject = subjects.find(s => s.id === subjectId);
         if (subject) {
           subject.deckIds.forEach(deckId => {
             const deck = DECKS[deckId];
             if (deck?.cards) {
-              cards.push(...deck.cards.map(c => ({ ...c, deckName: deck.name })));
+              const filteredDeckCards = filterCardsByBoard(deck.cards);
+              cards.push(...filteredDeckCards.map(c => ({ ...c, deckName: deck.name })));
             }
           });
         }
@@ -849,7 +898,7 @@ function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakDa
   const [showApiModal, setShowApiModal] = useState(false);
   const [exams, setExamsLocal] = useState(getExams);
   const [hideExamCountdown, setHideExamCountdown] = useState(getExamCountdownHidden);
-  const [examBoard, setExamBoard] = useState(() => loadLocal('examBoard', 'AQA'));
+  const { examBoard, changeExamBoard, filterCardsByBoard, getFilteredDeck } = useExamBoard();
 
   // Get current folder based on path
   const getCurrentFolder = () => {
@@ -884,12 +933,13 @@ function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakDa
   // Get all cards from a folder (recursively including subfolders)
   const getAllCardsFromFolder = (folder) => {
     const cards = [];
-    // Add cards from direct decks
+    // Add cards from direct decks - filtered by exam board
     if (folder.deckIds) {
       folder.deckIds.forEach(deckId => {
         const deck = DECKS[deckId];
         if (deck?.cards) {
-          cards.push(...deck.cards.map(c => ({ ...c, deckName: deck.name, deckIcon: deck.icon })));
+          const filteredDeckCards = filterCardsByBoard(deck.cards);
+          cards.push(...filteredDeckCards.map(c => ({ ...c, deckName: deck.name, deckIcon: deck.icon })));
         }
       });
     }
@@ -1028,10 +1078,10 @@ function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakDa
               <span style={{ color: '#64748b', fontSize: '12px' }}>Content tailored to your board</span>
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => { setExamBoard('AQA'); saveLocal('examBoard', 'AQA'); }} style={{ flex: 1, padding: '12px 16px', borderRadius: '10px', border: examBoard === 'AQA' ? '2px solid #3b82f6' : '1px solid rgba(100,116,139,0.3)', background: examBoard === 'AQA' ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)', color: examBoard === 'AQA' ? '#60a5fa' : '#94a3b8', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}>
+              <button onClick={() => changeExamBoard('AQA')} style={{ flex: 1, padding: '12px 16px', borderRadius: '10px', border: examBoard === 'AQA' ? '2px solid #3b82f6' : '1px solid rgba(100,116,139,0.3)', background: examBoard === 'AQA' ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)', color: examBoard === 'AQA' ? '#60a5fa' : '#94a3b8', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}>
                 AQA
               </button>
-              <button onClick={() => { setExamBoard('Edexcel'); saveLocal('examBoard', 'Edexcel'); }} style={{ flex: 1, padding: '12px 16px', borderRadius: '10px', border: examBoard === 'Edexcel' ? '2px solid #8b5cf6' : '1px solid rgba(100,116,139,0.3)', background: examBoard === 'Edexcel' ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.03)', color: examBoard === 'Edexcel' ? '#a78bfa' : '#94a3b8', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}>
+              <button onClick={() => changeExamBoard('Edexcel')} style={{ flex: 1, padding: '12px 16px', borderRadius: '10px', border: examBoard === 'Edexcel' ? '2px solid #8b5cf6' : '1px solid rgba(100,116,139,0.3)', background: examBoard === 'Edexcel' ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.03)', color: examBoard === 'Edexcel' ? '#a78bfa' : '#94a3b8', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}>
                 Edexcel
               </button>
             </div>
@@ -1065,17 +1115,18 @@ function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakDa
             const isDeck = item.type === 'deck' || item.cards;
             if (isDeck) {
               const deck = item;
-              if (!deck.cards || deck.cards.length === 0) return null; // Hide empty decks
+              const filteredDeckCards = filterCardsByBoard(deck.cards || []);
+              if (filteredDeckCards.length === 0) return null; // Hide empty decks for this board
               const progress = loadLocal(`progress_${deck.id}`, {});
               const known = Object.values(progress).filter(v => v === 'known').length;
-              const percent = Math.round((known / deck.cards.length) * 100);
+              const percent = Math.round((known / filteredDeckCards.length) * 100);
               return (
                 <div key={deck.id} onClick={() => openDeck(deck)} style={{ background: 'rgba(30,41,59,0.9)', borderRadius: '12px', padding: '16px', cursor: 'pointer', border: '1px solid rgba(100,116,139,0.2)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <span style={{ fontSize: '28px' }}>{deck.icon}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ color: '#f1f5f9', fontSize: '16px', fontWeight: 500 }}>{deck.name}</div>
-                      <div style={{ color: '#64748b', fontSize: '12px' }}>{deck.cards.length} cards</div>
+                      <div style={{ color: '#64748b', fontSize: '12px' }}>{filteredDeckCards.length} cards</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ color: percent === 100 ? '#10b981' : '#60a5fa', fontSize: '14px', fontWeight: 600 }}>{percent}%</div>
@@ -1176,6 +1227,11 @@ function ApiKeyModal({ openaiKey, onClose }) {
 
 // STUDY MODE (with spaced repetition)
 function Study({ deck, setView, streakData, setStreakData }) {
+  const { examBoard, filterCardsByBoard } = useExamBoard();
+
+  // Filter deck cards by exam board
+  const filteredCards = filterCardsByBoard(deck.cards);
+
   const [cardIndex, setCardIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -1183,7 +1239,7 @@ function Study({ deck, setView, streakData, setStreakData }) {
   const [favorites, setFavorites] = useState(() => loadLocal(`favorites_${deck.id}`, {}));
   const [shuffled, setShuffled] = useState(false);
   const [filter, setFilter] = useState('all');
-  const [order, setOrder] = useState(() => deck.cards.map((_, i) => i));
+  const [order, setOrder] = useState(() => filteredCards.map((_, i) => i));
   const [voice, setVoice] = useState(null);
   const [voices, setVoices] = useState([]);
   const [speed, setSpeed] = useState(0.9);
@@ -1191,7 +1247,7 @@ function Study({ deck, setView, streakData, setStreakData }) {
   const timerRef = useRef(null);
   const isPlayingRef = useRef(false);
 
-  const card = deck.cards[order[cardIndex]];
+  const card = filteredCards[order[cardIndex]];
   const knownCount = Object.values(progress).filter(v => v === 'known').length;
 
   useEffect(() => {
@@ -1205,15 +1261,15 @@ function Study({ deck, setView, streakData, setStreakData }) {
   }, []);
 
   useEffect(() => {
-    let indices = deck.cards.map((_, i) => i);
-    if (filter === 'favorites') indices = indices.filter(i => favorites[deck.cards[i].front]);
+    let indices = filteredCards.map((_, i) => i);
+    if (filter === 'favorites') indices = indices.filter(i => favorites[filteredCards[i].front]);
     if (shuffled && indices.length > 0) {
       for (let i = indices.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [indices[i], indices[j]] = [indices[j], indices[i]]; }
     }
-    setOrder(indices.length > 0 ? indices : deck.cards.map((_, i) => i));
+    setOrder(indices.length > 0 ? indices : filteredCards.map((_, i) => i));
     setCardIndex(0);
     setShowAnswer(false);
-  }, [shuffled, filter, favorites]);
+  }, [shuffled, filter, favorites, examBoard]);
 
   useEffect(() => { saveLocal(`progress_${deck.id}`, progress); }, [progress]);
   useEffect(() => { saveLocal(`favorites_${deck.id}`, favorites); }, [favorites]);
@@ -1230,7 +1286,7 @@ function Study({ deck, setView, streakData, setStreakData }) {
 
   const runAutoPlay = async (idx, doQ = true) => {
     while (isPlayingRef.current) {
-      const c = deck.cards[order[idx]];
+      const c = filteredCards[order[idx]];
       if (doQ) { setCardIndex(idx); setShowAnswer(false); setPhase('speaking-q'); await speak("Question. " + c.front); if (!isPlayingRef.current) break; setPhase('pause'); await new Promise(r => timerRef.current = setTimeout(r, 1500)); if (!isPlayingRef.current) break; }
       setShowAnswer(true); setPhase('speaking-a'); await speak("Answer. " + c.back); if (!isPlayingRef.current) break; setPhase('pause'); await new Promise(r => timerRef.current = setTimeout(r, 2500)); if (!isPlayingRef.current) break;
       idx = (idx + 1) % order.length; doQ = true;
@@ -1269,7 +1325,10 @@ function Study({ deck, setView, streakData, setStreakData }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <button onClick={() => { handleStop(); setView('home'); }} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '10px', padding: '10px 16px', color: '#94a3b8', cursor: 'pointer' }}>← Back</button>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ color: '#f1f5f9', fontWeight: 600 }}>{deck.name}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+              <span style={{ color: '#f1f5f9', fontWeight: 600 }}>{deck.name}</span>
+              <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: examBoard === 'AQA' ? 'rgba(59,130,246,0.2)' : 'rgba(139,92,246,0.2)', color: examBoard === 'AQA' ? '#60a5fa' : '#a78bfa' }}>{examBoard}</span>
+            </div>
             <div style={{ color: '#64748b', fontSize: '12px' }}>Card {cardIndex + 1}/{order.length} • {knownCount} mastered</div>
           </div>
           <button onClick={() => setView('quiz')} style={{ background: 'rgba(139,92,246,0.2)', border: 'none', borderRadius: '10px', padding: '10px 16px', color: '#a78bfa', cursor: 'pointer' }}>Quiz</button>
@@ -1277,7 +1336,7 @@ function Study({ deck, setView, streakData, setStreakData }) {
 
         {/* Filters */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-          <button onClick={() => setFilter('all')} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', fontSize: '12px', cursor: 'pointer', background: filter === 'all' ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.05)', color: filter === 'all' ? '#60a5fa' : '#64748b' }}>All ({deck.cards.length})</button>
+          <button onClick={() => setFilter('all')} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', fontSize: '12px', cursor: 'pointer', background: filter === 'all' ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.05)', color: filter === 'all' ? '#60a5fa' : '#64748b' }}>All ({filteredCards.length})</button>
           <button onClick={() => setFilter('favorites')} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', fontSize: '12px', cursor: 'pointer', background: filter === 'favorites' ? 'rgba(251,191,36,0.3)' : 'rgba(255,255,255,0.05)', color: filter === 'favorites' ? '#fbbf24' : '#64748b' }}>★ ({favCount})</button>
         </div>
 
@@ -1335,6 +1394,7 @@ function Study({ deck, setView, streakData, setStreakData }) {
 
 // QUIZ MODE
 function QuizMode({ deck, setView, quizCards, quizTitle, returnTo }) {
+  const { examBoard, filterCardsByBoard } = useExamBoard();
   const [questions, setQuestions] = useState([]);
   const [currentQ, setCurrentQ] = useState(0);
   const [score, setScore] = useState(0);
@@ -1347,8 +1407,10 @@ function QuizMode({ deck, setView, quizCards, quizTitle, returnTo }) {
   const timerRef = useRef(null);
 
   // Use quizCards if provided (from home page quiz), otherwise use deck.cards
-  const sourceCards = quizCards || (deck ? deck.cards : []);
-  const title = quizTitle || (deck ? deck.name : 'Quiz');
+  // Always filter by exam board
+  const rawCards = quizCards || (deck ? deck.cards : []);
+  const sourceCards = filterCardsByBoard(rawCards);
+  const title = quizTitle ? `${quizTitle} (${examBoard})` : (deck ? `${deck.name} (${examBoard})` : 'Quiz');
   const exitTo = returnTo || (deck ? 'study' : 'home');
 
   useEffect(() => {
@@ -2204,7 +2266,7 @@ function CreateDeck({ setView, openaiKey, user }) {
 }
 
 // RENDER
-ReactDOM.createRoot(document.getElementById('root')).render(<AuthProvider><App /></AuthProvider>);
+ReactDOM.createRoot(document.getElementById('root')).render(<AuthProvider><ExamBoardProvider><App /></ExamBoardProvider></AuthProvider>);
   </script>
 </body>
 </html>
