@@ -509,6 +509,7 @@ function App() {
   const [openaiKey, setOpenaiKey] = useState(() => loadLocal('openai_api_key', ''));
   const [streakData, setStreakData] = useState(getStreakData);
   const [showPlanner, setShowPlanner] = useState(false);
+  const [quizData, setQuizData] = useState(null); // For home page quiz
 
   if (loading) {
     return <div style={{ minHeight: '100vh', background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ color: '#60a5fa', fontSize: '18px' }}>Loading...</div></div>;
@@ -516,15 +517,15 @@ function App() {
 
   if (view === 'auth') return <AuthScreen setView={setView} />;
   if (view === 'study') return <Study deck={activeDeck} setView={setView} streakData={streakData} setStreakData={setStreakData} />;
-  if (view === 'quiz') return <QuizMode deck={activeDeck} setView={setView} />;
+  if (view === 'quiz') return <QuizMode deck={activeDeck} setView={setView} quizCards={quizData?.cards} quizTitle={quizData?.title} returnTo="home" />;
   if (view === 'create') return <CreateDeck setView={setView} openaiKey={openaiKey} user={user} />;
   if (view === 'exams') return <ExamCountdown setView={setView} />;
 
-  return <HomeWithPlanner path={path} setPath={setPath} setActiveDeck={setActiveDeck} setView={setView} user={user} openaiKey={openaiKey} streakData={streakData} showPlanner={showPlanner} setShowPlanner={setShowPlanner} />;
+  return <HomeWithPlanner path={path} setPath={setPath} setActiveDeck={setActiveDeck} setView={setView} user={user} openaiKey={openaiKey} streakData={streakData} showPlanner={showPlanner} setShowPlanner={setShowPlanner} setQuizData={setQuizData} />;
 }
 
 // HOME WITH PLANNER SIDEBAR
-function HomeWithPlanner({ path, setPath, setActiveDeck, setView, user, openaiKey, streakData, showPlanner, setShowPlanner }) {
+function HomeWithPlanner({ path, setPath, setActiveDeck, setView, user, openaiKey, streakData, showPlanner, setShowPlanner, setQuizData }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 900);
   const [plannerCollapsed, setPlannerCollapsed] = useState(() => loadLocal('plannerCollapsed', false));
 
@@ -544,7 +545,7 @@ function HomeWithPlanner({ path, setPath, setActiveDeck, setView, user, openaiKe
     <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #0f172a, #1e293b)', display: 'flex' }}>
       {/* Main Content */}
       <div style={{ flex: 1, minWidth: 0, padding: '20px', fontFamily: 'system-ui' }}>
-        <Home path={path} setPath={setPath} setActiveDeck={setActiveDeck} setView={setView} user={user} openaiKey={openaiKey} streakData={streakData} showPlanner={showPlanner} setShowPlanner={setShowPlanner} isMobile={isMobile} />
+        <Home path={path} setPath={setPath} setActiveDeck={setActiveDeck} setView={setView} user={user} openaiKey={openaiKey} streakData={streakData} showPlanner={showPlanner} setShowPlanner={setShowPlanner} isMobile={isMobile} setQuizData={setQuizData} />
       </div>
 
       {/* Planner Sidebar - Desktop */}
@@ -580,6 +581,141 @@ function HomeWithPlanner({ path, setPath, setActiveDeck, setView, user, openaiKe
       )}
 
       <style>{`@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
+    </div>
+  );
+}
+
+// QUICK QUIZ SECTION - Quiz from home page with subject selection
+function QuickQuizSection({ setView, setQuizData }) {
+  const [expanded, setExpanded] = useState(false);
+  const [quizMode, setQuizMode] = useState('subjects'); // 'subjects' or 'favorites'
+  const [selectedSubjects, setSelectedSubjects] = useState([]);
+
+  // Get all subjects (folders with decks) for selection
+  const getAllSubjects = () => {
+    const subjects = [];
+    const traverse = (folder, parentPath = '') => {
+      const path = parentPath ? `${parentPath} > ${folder.name}` : folder.name;
+      if (folder.deckIds && folder.deckIds.length > 0) {
+        const cardCount = folder.deckIds.reduce((sum, id) => sum + (DECKS[id]?.cards?.length || 0), 0);
+        subjects.push({ id: folder.id, name: folder.name, path, icon: folder.icon, deckIds: folder.deckIds, cardCount });
+      }
+      if (folder.children) {
+        folder.children.forEach(child => traverse(child, path));
+      }
+    };
+    FOLDERS.forEach(f => traverse(f));
+    return subjects;
+  };
+
+  // Get all favorited cards
+  const getFavoriteCards = () => {
+    const cards = [];
+    Object.keys(DECKS).forEach(deckId => {
+      const deck = DECKS[deckId];
+      if (!deck.cards || deck.cards.length === 0) return;
+      const favorites = loadLocal(`favorites_${deckId}`, {});
+      deck.cards.forEach(card => {
+        if (favorites[card.front]) {
+          cards.push({ ...card, deckName: deck.name });
+        }
+      });
+    });
+    return cards;
+  };
+
+  const subjects = getAllSubjects();
+  const favoriteCards = getFavoriteCards();
+
+  const toggleSubject = (subjectId) => {
+    setSelectedSubjects(prev =>
+      prev.includes(subjectId) ? prev.filter(id => id !== subjectId) : [...prev, subjectId]
+    );
+  };
+
+  const startQuiz = () => {
+    let cards = [];
+    let title = '';
+
+    if (quizMode === 'favorites') {
+      cards = favoriteCards;
+      title = 'Favourites Quiz';
+    } else {
+      // Collect cards from selected subjects
+      selectedSubjects.forEach(subjectId => {
+        const subject = subjects.find(s => s.id === subjectId);
+        if (subject) {
+          subject.deckIds.forEach(deckId => {
+            const deck = DECKS[deckId];
+            if (deck?.cards) {
+              cards.push(...deck.cards.map(c => ({ ...c, deckName: deck.name })));
+            }
+          });
+        }
+      });
+      title = selectedSubjects.length === 1
+        ? subjects.find(s => s.id === selectedSubjects[0])?.name + ' Quiz'
+        : `Mixed Quiz (${selectedSubjects.length} subjects)`;
+    }
+
+    if (cards.length === 0) return;
+
+    setQuizData({ cards, title });
+    setView('quiz');
+  };
+
+  const canStartQuiz = quizMode === 'favorites' ? favoriteCards.length > 0 : selectedSubjects.length > 0;
+
+  return (
+    <div style={{ marginBottom: '20px' }}>
+      {/* Header */}
+      <button onClick={() => setExpanded(!expanded)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '12px', cursor: 'pointer', marginBottom: expanded ? '12px' : 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '20px' }}>🎯</span>
+          <span style={{ color: '#a78bfa', fontWeight: 600, fontSize: '14px' }}>Quick Quiz</span>
+        </div>
+        <span style={{ color: '#a78bfa', fontSize: '16px', transform: expanded ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }}>▼</span>
+      </button>
+
+      {/* Expanded Content */}
+      {expanded && (
+        <div style={{ background: 'rgba(30,41,59,0.9)', borderRadius: '12px', border: '1px solid rgba(100,116,139,0.2)', padding: '16px' }}>
+          {/* Mode Toggle */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            <button onClick={() => setQuizMode('subjects')} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, background: quizMode === 'subjects' ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.05)', color: quizMode === 'subjects' ? '#a78bfa' : '#64748b' }}>By Subject</button>
+            <button onClick={() => setQuizMode('favorites')} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, background: quizMode === 'favorites' ? 'rgba(251,191,36,0.3)' : 'rgba(255,255,255,0.05)', color: quizMode === 'favorites' ? '#fbbf24' : '#64748b' }}>Favourites ({favoriteCards.length})</button>
+          </div>
+
+          {quizMode === 'subjects' ? (
+            <div>
+              <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '10px' }}>Select subjects to quiz:</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '200px', overflowY: 'auto' }}>
+                {subjects.map(subject => (
+                  <button key={subject.id} onClick={() => toggleSubject(subject.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: selectedSubjects.includes(subject.id) ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.03)', transition: 'background 0.2s' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '16px' }}>{subject.icon}</span>
+                      <span style={{ color: selectedSubjects.includes(subject.id) ? '#a78bfa' : '#e2e8f0', fontSize: '13px' }}>{subject.name}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ color: '#64748b', fontSize: '11px' }}>{subject.cardCount} cards</span>
+                      {selectedSubjects.includes(subject.id) && <span style={{ color: '#a78bfa' }}>✓</span>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '12px 0' }}>
+              {favoriteCards.length > 0 ? `Quiz through your ${favoriteCards.length} favourited cards` : 'No favourites yet. Star some cards to quiz them!'}
+            </div>
+          )}
+
+          {/* Start Quiz Button */}
+          <button onClick={startQuiz} disabled={!canStartQuiz} style={{ width: '100%', marginTop: '14px', padding: '12px', borderRadius: '10px', border: 'none', background: canStartQuiz ? '#8b5cf6' : 'rgba(139,92,246,0.2)', color: canStartQuiz ? 'white' : '#64748b', fontSize: '14px', fontWeight: 600, cursor: canStartQuiz ? 'pointer' : 'not-allowed' }}>
+            Start Quiz {quizMode === 'subjects' && selectedSubjects.length > 0 && `(${selectedSubjects.length} subjects)`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -708,7 +844,7 @@ function FavoritesSection({ setActiveDeck, setView }) {
 }
 
 // HOME WITH FOLDERS
-function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakData, showPlanner, setShowPlanner, isMobile }) {
+function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakData, showPlanner, setShowPlanner, isMobile, setQuizData }) {
   const { signOut } = useAuth();
   const [showApiModal, setShowApiModal] = useState(false);
   const [exams, setExamsLocal] = useState(getExams);
@@ -742,6 +878,36 @@ function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakDa
   const openDeck = (deck) => {
     setActiveDeck(deck);
     setView('study');
+  };
+
+  // Get all cards from a folder (recursively including subfolders)
+  const getAllCardsFromFolder = (folder) => {
+    const cards = [];
+    // Add cards from direct decks
+    if (folder.deckIds) {
+      folder.deckIds.forEach(deckId => {
+        const deck = DECKS[deckId];
+        if (deck?.cards) {
+          cards.push(...deck.cards.map(c => ({ ...c, deckName: deck.name, deckIcon: deck.icon })));
+        }
+      });
+    }
+    // Add cards from children folders
+    if (folder.children) {
+      folder.children.forEach(child => {
+        cards.push(...getAllCardsFromFolder(child));
+      });
+    }
+    return cards;
+  };
+
+  // Start shuffle mode quiz for current folder
+  const startShuffleQuiz = () => {
+    if (!currentFolder) return;
+    const allCards = getAllCardsFromFolder(currentFolder);
+    if (allCards.length === 0) return;
+    setQuizData({ cards: allCards, title: `${currentFolder.name} Shuffle` });
+    setView('quiz');
   };
 
   // Get next upcoming exam
@@ -836,11 +1002,18 @@ function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakDa
           </div>
         )}
 
-        {/* Back button */}
+        {/* Back button and Shuffle option */}
         {path.length > 0 && (
-          <button onClick={navigateUp} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '10px', padding: '12px 16px', color: '#94a3b8', fontSize: '14px', cursor: 'pointer', marginBottom: '16px' }}>
-            ← Back
-          </button>
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+            <button onClick={navigateUp} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '10px', padding: '12px 16px', color: '#94a3b8', fontSize: '14px', cursor: 'pointer' }}>
+              ← Back
+            </button>
+            {currentFolder && (currentFolder.children || currentFolder.deckIds) && (
+              <button onClick={startShuffleQuiz} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '10px', padding: '12px 16px', color: '#a78bfa', fontSize: '14px', cursor: 'pointer', marginLeft: 'auto' }}>
+                🔀 Shuffle All
+              </button>
+            )}
+          </div>
         )}
 
         {/* Quick Actions */}
@@ -854,6 +1027,9 @@ function Home({ path, setPath, setActiveDeck, setView, user, openaiKey, streakDa
             </button>
           </div>
         )}
+
+        {/* Quick Quiz Section */}
+        {path.length === 0 && <QuickQuizSection setView={setView} setQuizData={setQuizData} />}
 
         {/* Favorites Section */}
         {path.length === 0 && <FavoritesSection setActiveDeck={setActiveDeck} setView={setView} />}
@@ -1133,7 +1309,7 @@ function Study({ deck, setView, streakData, setStreakData }) {
 }
 
 // QUIZ MODE
-function QuizMode({ deck, setView }) {
+function QuizMode({ deck, setView, quizCards, quizTitle, returnTo }) {
   const [questions, setQuestions] = useState([]);
   const [currentQ, setCurrentQ] = useState(0);
   const [score, setScore] = useState(0);
@@ -1141,11 +1317,18 @@ function QuizMode({ deck, setView }) {
   const [answered, setAnswered] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
   const [quizComplete, setQuizComplete] = useState(false);
+  const [answers, setAnswers] = useState([]); // Track each answer for detailed results
+  const [showDetailedResults, setShowDetailedResults] = useState(false);
   const timerRef = useRef(null);
 
+  // Use quizCards if provided (from home page quiz), otherwise use deck.cards
+  const sourceCards = quizCards || (deck ? deck.cards : []);
+  const title = quizTitle || (deck ? deck.name : 'Quiz');
+  const exitTo = returnTo || (deck ? 'study' : 'home');
+
   useEffect(() => {
-    // Shuffle and pick 10 questions
-    const shuffled = [...deck.cards].sort(() => Math.random() - 0.5).slice(0, 10);
+    // Shuffle and pick up to 10 questions
+    const shuffled = [...sourceCards].sort(() => Math.random() - 0.5).slice(0, Math.min(10, sourceCards.length));
     setQuestions(shuffled);
   }, []);
 
@@ -1153,7 +1336,7 @@ function QuizMode({ deck, setView }) {
     if (!quizComplete && questions.length > 0 && !answered) {
       timerRef.current = setInterval(() => {
         setTimeLeft(t => {
-          if (t <= 1) { handleAnswer(false); return 30; }
+          if (t <= 1) { handleAnswer(false, true); return 30; }
           return t - 1;
         });
       }, 1000);
@@ -1161,11 +1344,27 @@ function QuizMode({ deck, setView }) {
     return () => clearInterval(timerRef.current);
   }, [currentQ, answered, quizComplete]);
 
-  const handleAnswer = (correct) => {
+  const handleAnswer = (correct, fromTimer = false) => {
     clearInterval(timerRef.current);
     setAnswered(true);
     setShowResult(true);
     if (correct) setScore(s => s + 1);
+    // Track the answer
+    setAnswers(prev => [...prev, { question: questions[currentQ], correct, timedOut: fromTimer }]);
+
+    // Auto-advance after a brief delay when user clicks right/wrong
+    if (!fromTimer) {
+      setTimeout(() => {
+        if (currentQ + 1 >= questions.length) {
+          setQuizComplete(true);
+        } else {
+          setCurrentQ(c => c + 1);
+          setAnswered(false);
+          setShowResult(false);
+          setTimeLeft(30);
+        }
+      }, 800);
+    }
   };
 
   const nextQuestion = () => {
@@ -1183,13 +1382,83 @@ function QuizMode({ deck, setView }) {
 
   if (quizComplete) {
     const percent = Math.round((score / questions.length) * 100);
+    const correctAnswers = answers.filter(a => a.correct);
+    const wrongAnswers = answers.filter(a => !a.correct);
+
     return (
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #0f172a, #1e293b)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-        <div style={{ textAlign: 'center', color: '#f1f5f9' }}>
-          <div style={{ fontSize: '64px', marginBottom: '16px' }}>{percent >= 80 ? '🏆' : percent >= 50 ? '👍' : '📚'}</div>
-          <h2 style={{ fontSize: '28px', marginBottom: '8px' }}>Quiz Complete!</h2>
-          <p style={{ fontSize: '20px', color: '#60a5fa', marginBottom: '24px' }}>{score}/{questions.length} correct ({percent}%)</p>
-          <button onClick={() => setView('home')} style={{ padding: '14px 32px', borderRadius: '10px', border: 'none', background: '#3b82f6', color: 'white', fontSize: '16px', fontWeight: 600, cursor: 'pointer' }}>Back to Home</button>
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #0f172a, #1e293b)', padding: '20px', overflowY: 'auto' }}>
+        <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+          {!showDetailedResults ? (
+            <div style={{ textAlign: 'center', color: '#f1f5f9', paddingTop: '40px' }}>
+              <div style={{ fontSize: '64px', marginBottom: '16px' }}>{percent >= 80 ? '🏆' : percent >= 50 ? '👍' : '📚'}</div>
+              <h2 style={{ fontSize: '28px', marginBottom: '8px' }}>Quiz Complete!</h2>
+              <p style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '16px' }}>{title}</p>
+              <p style={{ fontSize: '24px', color: '#60a5fa', marginBottom: '8px' }}>{score}/{questions.length} correct ({percent}%)</p>
+
+              {/* Summary bars */}
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(16,185,129,0.2)', padding: '8px 14px', borderRadius: '8px' }}>
+                  <span style={{ color: '#10b981', fontSize: '18px' }}>✓</span>
+                  <span style={{ color: '#10b981', fontWeight: 600 }}>{correctAnswers.length} correct</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(239,68,68,0.2)', padding: '8px 14px', borderRadius: '8px' }}>
+                  <span style={{ color: '#ef4444', fontSize: '18px' }}>✗</span>
+                  <span style={{ color: '#ef4444', fontWeight: 600 }}>{wrongAnswers.length} wrong</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <button onClick={() => setShowDetailedResults(true)} style={{ padding: '14px 32px', borderRadius: '10px', border: 'none', background: 'rgba(255,255,255,0.1)', color: '#f1f5f9', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}>View Detailed Results</button>
+                <button onClick={() => setView('home')} style={{ padding: '14px 32px', borderRadius: '10px', border: 'none', background: '#3b82f6', color: 'white', fontSize: '16px', fontWeight: 600, cursor: 'pointer' }}>Back to Home</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ color: '#f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                <button onClick={() => setShowDetailedResults(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '8px', padding: '8px 14px', color: '#94a3b8', cursor: 'pointer' }}>← Back</button>
+                <h3 style={{ fontSize: '18px', margin: 0 }}>Detailed Results</h3>
+                <div style={{ width: '60px' }}></div>
+              </div>
+
+              {/* Wrong answers first */}
+              {wrongAnswers.length > 0 && (
+                <div style={{ marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <span style={{ color: '#ef4444', fontSize: '16px' }}>✗</span>
+                    <span style={{ color: '#ef4444', fontWeight: 600, fontSize: '14px' }}>Needs Review ({wrongAnswers.length})</span>
+                  </div>
+                  {wrongAnswers.map((a, i) => (
+                    <div key={i} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '10px', padding: '14px', marginBottom: '10px' }}>
+                      <div style={{ color: '#f87171', fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', marginBottom: '6px' }}>{a.question.category} {a.timedOut && '• Timed out'}</div>
+                      <div style={{ color: '#f1f5f9', fontSize: '14px', marginBottom: '10px' }}>{a.question.front}</div>
+                      <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '10px' }}>
+                        <div style={{ color: '#10b981', fontSize: '10px', fontWeight: 600, marginBottom: '4px' }}>CORRECT ANSWER</div>
+                        <div style={{ color: '#cbd5e1', fontSize: '13px', lineHeight: 1.4 }}>{a.question.back}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Correct answers */}
+              {correctAnswers.length > 0 && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <span style={{ color: '#10b981', fontSize: '16px' }}>✓</span>
+                    <span style={{ color: '#10b981', fontWeight: 600, fontSize: '14px' }}>Got Correct ({correctAnswers.length})</span>
+                  </div>
+                  {correctAnswers.map((a, i) => (
+                    <div key={i} style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '10px', padding: '14px', marginBottom: '10px' }}>
+                      <div style={{ color: '#34d399', fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', marginBottom: '6px' }}>{a.question.category}</div>
+                      <div style={{ color: '#f1f5f9', fontSize: '14px' }}>{a.question.front}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button onClick={() => setView('home')} style={{ width: '100%', marginTop: '20px', padding: '14px', borderRadius: '10px', border: 'none', background: '#3b82f6', color: 'white', fontSize: '16px', fontWeight: 600, cursor: 'pointer' }}>Back to Home</button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1200,7 +1469,7 @@ function QuizMode({ deck, setView }) {
     <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #0f172a, #1e293b)', padding: '20px' }}>
       <div style={{ maxWidth: '500px', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <button onClick={() => setView('study')} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '8px', padding: '8px 14px', color: '#94a3b8', cursor: 'pointer' }}>← Exit</button>
+          <button onClick={() => setView(exitTo)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '8px', padding: '8px 14px', color: '#94a3b8', cursor: 'pointer' }}>← Exit</button>
           <div style={{ color: '#f1f5f9', fontWeight: 600 }}>Question {currentQ + 1}/{questions.length}</div>
           <div style={{ color: timeLeft <= 10 ? '#ef4444' : '#10b981', fontWeight: 600 }}>{timeLeft}s</div>
         </div>
@@ -1209,6 +1478,9 @@ function QuizMode({ deck, setView }) {
         <div style={{ height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', marginBottom: '20px' }}>
           <div style={{ width: `${(timeLeft / 30) * 100}%`, height: '100%', background: timeLeft <= 10 ? '#ef4444' : '#10b981', borderRadius: '2px', transition: 'width 1s linear' }}></div>
         </div>
+
+        {/* Quiz title */}
+        <div style={{ color: '#64748b', fontSize: '12px', textAlign: 'center', marginBottom: '12px' }}>{title}</div>
 
         {/* Question */}
         <div style={{ background: 'rgba(30,41,59,0.9)', borderRadius: '16px', padding: '24px', marginBottom: '20px' }}>
@@ -1222,21 +1494,21 @@ function QuizMode({ deck, setView }) {
               <div style={{ color: '#10b981', fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>ANSWER</div>
               <div style={{ color: '#f1f5f9', fontSize: '14px', lineHeight: 1.5 }}>{q.back}</div>
             </div>
-            <button onClick={nextQuestion} style={{ width: '100%', padding: '14px', borderRadius: '10px', border: 'none', background: '#3b82f6', color: 'white', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}>
-              {currentQ + 1 >= questions.length ? 'See Results' : 'Next Question →'}
-            </button>
+            {!answered ? (
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button onClick={() => handleAnswer(false)} style={{ flex: 1, padding: '14px', borderRadius: '10px', border: 'none', background: '#ef4444', color: 'white', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}>Got it Wrong ✗</button>
+                <button onClick={() => handleAnswer(true)} style={{ flex: 1, padding: '14px', borderRadius: '10px', border: 'none', background: '#10b981', color: 'white', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}>Got it Right ✓</button>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '14px', color: '#64748b', fontSize: '14px' }}>
+                {answered && answers[answers.length - 1]?.correct ? '✓ Correct!' : '✗ Wrong'} — Moving to next...
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ display: 'flex', gap: '12px' }}>
             <button onClick={() => handleAnswer(false)} style={{ flex: 1, padding: '16px', borderRadius: '10px', border: 'none', background: 'rgba(239,68,68,0.2)', color: '#f87171', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}>Don't Know</button>
             <button onClick={() => { setShowResult(true); clearInterval(timerRef.current); }} style={{ flex: 1, padding: '16px', borderRadius: '10px', border: 'none', background: 'rgba(16,185,129,0.2)', color: '#34d399', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}>Show Answer</button>
-          </div>
-        )}
-
-        {showResult && !answered && (
-          <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-            <button onClick={() => handleAnswer(false)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: '#ef4444', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>Got it Wrong</button>
-            <button onClick={() => handleAnswer(true)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: '#10b981', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>Got it Right ✓</button>
           </div>
         )}
       </div>
@@ -1534,17 +1806,20 @@ function RevisionPlanner() {
             })}
           </div>
 
-          {/* Subject Legend */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
-            {subjects.slice(0, 6).map(s => (
-              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '9px', color: '#94a3b8' }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.color.dot }} />
-                {s.name.slice(0, 8)}
-              </div>
-            ))}
-          </div>
+          <button onClick={() => { setNewSession({ ...newSession, date: selectedDate }); setShowAddSession(true); }} style={{ width: '100%', background: '#8b5cf6', border: 'none', borderRadius: '8px', padding: '10px', color: 'white', fontSize: '12px', fontWeight: 500, cursor: 'pointer', marginBottom: '12px' }}>+ Add Session</button>
 
-          <button onClick={() => { setNewSession({ ...newSession, date: selectedDate }); setShowAddSession(true); }} style={{ width: '100%', background: '#8b5cf6', border: 'none', borderRadius: '8px', padding: '10px', color: 'white', fontSize: '12px', fontWeight: 500, cursor: 'pointer' }}>+ Add Session</button>
+          {/* Subject Legend - List format */}
+          <div style={{ background: 'rgba(30,41,59,0.5)', borderRadius: '8px', padding: '10px' }}>
+            <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '8px' }}>Subject Colours</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {subjects.map(s => (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#94a3b8' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: s.color.dot, flexShrink: 0 }} />
+                  <span>{s.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </>
       )}
 
